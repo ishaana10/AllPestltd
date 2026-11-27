@@ -10,7 +10,7 @@ if (!ApAccess::can((string)($_SESSION['nu_user_id'] ?? ''), 'admin.settings')) {
 $fields = [
     'Company' => [['company_name', 'Company name', 'text'], ['company_address', 'Company address', 'text'], ['company_phone', 'Company phone', 'text'], ['company_email', 'Company email (printed on documents)', 'email'], ['company_website', 'Company website', 'text'], ['treatment_provider_id', 'Treatment provider ID', 'text'], ['staff_email', 'Office email (request notifications)', 'email']],
     'Invoicing (NuvisERPX)' => [['erpx.base_url', 'ERPX address', 'text'], ['erpx.api_key', 'ERPX API key', 'password'], ['erpx.product.general', 'ERPX product code: general fumigation', 'text'],
-        ['erpx.product.perishable', 'ERPX product code: perishable fumigation', 'text'], ['erpx.tax_rate', 'Tax rate (%)', 'text'], ['invoice.mode', 'Invoice release', 'mode']],
+        ['erpx.product.perishable', 'ERPX product code: perishable fumigation', 'text'], ['erpx.tax_rate', 'Tax rate (%)', 'text']],
     'Certificates and stock' => [['certificate_admin_verify', 'Admin verifies certificates (1 = yes)', 'text'], ['certificate_target', 'Certificate target', 'text'], ['certificate_additional_declarations', 'Certificate additional declarations', 'text'], ['stock.low_threshold_g', 'Low stock alert (grams)', 'text']],
 ];
 ?>
