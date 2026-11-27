@@ -57,8 +57,14 @@ final class FormSaveHardeningTest extends TestCase
     public function testAFormThatDefinesItsOwnUserIdFieldKeepsWhatWasChosen(): void
     {
         $src = (string)file_get_contents(dirname(__DIR__, 3) . '/api/form.php');
-        $this->assertStringContainsString('$formOwnsUserId', $src);
-        $this->assertStringContainsString('!$formOwnsUserId', $src);
-        $this->assertStringContainsString('if (!$formOwnsUserId) { unset($save[\'user_id\']); }', $src);
+        foreach (['function nu_handle_save()', 'function nu_handle_subform_save()'] as $fn) {
+            $start = strpos($src, $fn);
+            $this->assertTrue($start !== false);
+            $next = strpos($src, "\nfunction ", $start + 10);
+            $body = substr($src, $start, $next === false ? null : $next - $start);
+            $this->assertStringContainsString('$formOwnsUserId = false;', $body, $fn);
+            $this->assertStringContainsString('&& !$formOwnsUserId) $save[\'user_id\']', $body, $fn);
+            $this->assertStringContainsString('if (!$formOwnsUserId) { unset($save[\'user_id\']); }', $body, $fn);
+        }
     }
 }
