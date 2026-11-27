@@ -3,6 +3,14 @@
 window.ApSigning = (function () {
   'use strict';
   var U = ApUi, id = null, pad = null, admin = false, $ = function (x) { return document.getElementById(x); };
+  function note(anchorId, msg, bad) {
+    var a = $(anchorId); if (!a) { U.toast(msg, bad); return; }
+    var n = $('smsg_' + anchorId);
+    if (!n) { n = document.createElement('p'); n.id = 'smsg_' + anchorId; n.setAttribute('role', 'status'); a.parentNode.insertBefore(n, a.nextSibling); }
+    n.textContent = msg; n.style.color = bad ? '#b91c1c' : '#15803d'; n.style.fontWeight = '600';
+    U.toast(msg, bad);
+  }
+  function failNote(anchorId) { return function (e) { note(anchorId, e && e.message ? e.message : String(e), true); }; }
   function load() {
     U.get('sign.php', { treatment_id: id }).then(function (s) {
       $('state').innerHTML = '<p>' + (s.locked ? 'Signed and locked.' : 'Not signed yet.') + ' ' + (s.fully_signed ? '<strong>Both signatures are in.</strong>' : '') + '</p>' +
@@ -20,10 +28,10 @@ window.ApSigning = (function () {
   function start(treatmentId) {
     id = treatmentId; api.started = true; admin = $('s_sign').getAttribute('data-admin') === '1';
     pad = ApSignPad($('pad'));
-    $('fsign').onclick = function () { U.post('sign.php', { action: 'fumigator_sign', treatment_id: id, password: $('pw').value, mfa_code: $('mfa').value }).then(function () { $('pw').value = ''; U.toast('Signed'); load(); }, U.fail); };
+    $('fsign').onclick = function () { U.post('sign.php', { action: 'fumigator_sign', treatment_id: id, password: $('pw').value, mfa_code: $('mfa').value }).then(function (r) { $('pw').value = ''; $('mfa').value = ''; note('fsign', r && r.recorded === false ? 'You had already signed this version.' : 'Signed as fumigator.', false); load(); }, failNote('fsign')); };
     $('osign').onclick = function () {
-      var png = pad.toPng(); if (!png) { U.toast('The officer has not signed yet', true); return; }
-      U.post('sign.php', { action: 'officer_sign', treatment_id: id, name: $('on').value, designation: $('od').value, png: png }).then(function () { pad.clear(); U.toast('Signed'); load(); }, U.fail);
+      var png = pad.toPng(); if (!png) { note('osign', 'The officer has not signed yet: draw the signature first.', true); return; }
+      U.post('sign.php', { action: 'officer_sign', treatment_id: id, name: $('on').value, designation: $('od').value, png: png }).then(function (r) { pad.clear(); note('osign', r && r.recorded === false ? 'An officer signature is already recorded for this version.' : 'Officer signature saved (the pad is cleared; it is listed under Signatures above).', false); load(); }, failNote('osign'));
     };
     $('clr').onclick = function () { pad.clear(); };
     if (admin) {
