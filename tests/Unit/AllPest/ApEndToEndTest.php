@@ -131,14 +131,13 @@ final class ApEndToEndTest extends TestCase
         $this->assertSame('fail', $this->db->fetchOne('SELECT result FROM ap_treatment_containers WHERE id = ?', [$tcs[2]])['result']);
         $this->assertSame('completed', $this->db->fetchOne('SELECT status FROM ap_requests WHERE id = ?', [$req])['status']);
 
-        // 7. invoice was raised on close: five lines (the failed container is billed too), as a draft
-        $link = $this->db->fetchOne('SELECT * FROM ap_invoice_links WHERE request_id = ?', [$req]);
-        $this->assertSame('draft', $link['state']);
+        // 7. invoice was raised locally on close: five lines (the failed container is billed too), as a draft; ERPX is not called yet
+        $local = $this->db->fetchOne('SELECT * FROM ap_invoices WHERE request_id = ?', [$req]);
+        $this->assertSame('draft', $local['status']);
+        $this->assertCount(5, $this->db->fetchAll('SELECT id FROM ap_invoice_lines WHERE invoice_id = ?', [$local['id']]));
+        $this->assertEquals(690.0, (float)$local['total']);
         $ref = $this->db->fetchOne('SELECT reference FROM ap_requests WHERE id = ?', [$req])['reference'];
-        $inv = $this->invoicesByRef[$ref];
-        $this->assertCount(5, $inv['items']);
-        $this->assertSame('draft', $inv['status']);
-        $this->assertEquals(690.0, (float)$inv['total']);
+        $this->assertFalse(isset($this->invoicesByRef[$ref]));
 
         // 8. no certificates before both signatures
         $none = ApCertificates::issueEligible($tid, $this->utc('2026-12-12 00:00:00'));
@@ -160,12 +159,14 @@ final class ApEndToEndTest extends TestCase
         $again = ApCertificates::issueEligible($tid, $this->utc('2026-12-12 01:00:00'));
         $this->assertSame([], $again['issued'], 'a repeat creates no second certificate');
 
-        // 11. release the draft: ERPX is told once, state becomes released and the invoice is unpaid
-        ApInvoices::release($req, 'admin1');
-        ApInvoices::release($req, 'admin2');
-        $this->assertCount(1, array_filter($this->erpxCalls, fn ($c) => $c[0] === 'PATCH'));
-        $this->assertSame('released', $this->db->fetchOne('SELECT state FROM ap_invoice_links WHERE request_id = ?', [$req])['state']);
-        $this->assertSame('unpaid', $this->invoicesByRef[$ref]['status_now']);
+        // 11. finance verifies, then posts: ERPX is told once and the invoice is unpaid there
+        ApInvoices::verify((string)$local['id'], 'fin1');
+        ApInvoices::post((string)$local['id'], 'fin1');
+        ApInvoices::post((string)$local['id'], 'fin2');
+        $this->assertCount(1, array_filter($this->erpxCalls, fn ($c) => $c[0] === 'POST' && str_contains($c[1], 'invoices.php')));
+        $this->assertSame('posted', $this->db->fetchOne('SELECT status FROM ap_invoices WHERE request_id = ?', [$req])['status']);
+        $this->assertCount(5, $this->invoicesByRef[$ref]['items']);
+        $this->assertEquals(690.0, (float)$this->invoicesByRef[$ref]['total']);
 
         // 12. audit pack lists everything, integrity ok
         $zip = new ZipArchive();

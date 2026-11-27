@@ -96,6 +96,13 @@ final class ApSchema
             'certificate_numbers' => [$id . ', number VARCHAR(30) NOT NULL UNIQUE, container_id CHAR(36) NULL, allocated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP', []],
             'invoice_links' => [$id . ', request_id CHAR(36) NOT NULL UNIQUE, state VARCHAR(12) NOT NULL DEFAULT \'pending\', erpx_invoice_id INTEGER NULL, erpx_invoice_no VARCHAR(60) NULL, '
                 . 'attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT NULL, next_attempt_at DATETIME NULL, ' . $created . ', ' . $updated, []],
+            'invoices' => [$id . ', request_id CHAR(36) NOT NULL UNIQUE, invoice_no VARCHAR(30) NOT NULL UNIQUE, status VARCHAR(12) NOT NULL DEFAULT \'draft\', invoice_date DATE NULL, due_date DATE NULL, '
+                . 'customer_name VARCHAR(200) NULL, customer_email VARCHAR(200) NULL, customer_tin VARCHAR(50) NULL, customer_phone VARCHAR(50) NULL, customer_address TEXT NULL, '
+                . 'tax_rate DECIMAL(5,2) NOT NULL DEFAULT 0, subtotal DECIMAL(12,2) NOT NULL DEFAULT 0, tax_amount DECIMAL(12,2) NOT NULL DEFAULT 0, discount DECIMAL(12,2) NOT NULL DEFAULT 0, total DECIMAL(12,2) NOT NULL DEFAULT 0, '
+                . 'notes TEXT NULL, verified_by VARCHAR(64) NULL, verified_at DATETIME NULL, posted_by VARCHAR(64) NULL, posted_at DATETIME NULL, erpx_invoice_id INTEGER NULL, erpx_invoice_no VARCHAR(60) NULL, '
+                . 'attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT NULL, next_attempt_at DATETIME NULL, ' . $created . ', ' . $updated, []],
+            'invoice_lines' => [$id . ', invoice_id CHAR(36) NOT NULL, sort_no INTEGER NOT NULL DEFAULT 0, treatment_id CHAR(36) NULL, container_id CHAR(36) NULL, description VARCHAR(255) NOT NULL, '
+                . 'qty DECIMAL(8,2) NOT NULL DEFAULT 1, unit_price DECIMAL(12,2) NOT NULL DEFAULT 0, tax_amount DECIMAL(12,2) NOT NULL DEFAULT 0, amount DECIMAL(12,2) NOT NULL DEFAULT 0', ['invoice_id']],
             'temp_readings' => [$id . ', treatment_id CHAR(36) NOT NULL, taken_at DATETIME NOT NULL, initials VARCHAR(10) NOT NULL, values_json TEXT NOT NULL, created_by VARCHAR(64) NULL, ' . $created, ['treatment_id']],
             'intake_throttle' => [$id . ', ip VARCHAR(45) NOT NULL, ' . $created, ['ip']],
         ];
