@@ -53,4 +53,12 @@ final class FormSaveHardeningTest extends TestCase
         $this->assertStringContainsString("'ApInvoices'", $src);
         $this->assertStringContainsString("'ApErpxClient'", $src);
     }
+
+    public function testAFormThatDefinesItsOwnUserIdFieldKeepsWhatWasChosen(): void
+    {
+        $src = (string)file_get_contents(dirname(__DIR__, 3) . '/api/form.php');
+        $this->assertStringContainsString('$formOwnsUserId', $src);
+        $this->assertStringContainsString('!$formOwnsUserId', $src);
+        $this->assertStringContainsString('if (!$formOwnsUserId) { unset($save[\'user_id\']); }', $src);
+    }
 }
