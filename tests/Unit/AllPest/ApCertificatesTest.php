@@ -203,6 +203,22 @@ final class ApCertificatesTest extends TestCase
         $this->assertSame('2345', $d['equipment'][0]['serial_last4']);
     }
 
+    public function testCertificateCarriesTheTemplateFields(): void
+    {
+        $this->db->update('ap_treatments', ['target_of_fumigation' => 'commodity,packaging', 'enclosure_other' => '', 'loc_street' => '1 Wharf Rd', 'loc_suburb' => 'Lautoka', 'loc_country' => 'Fiji', 'loc_postcode' => '0000'], 'id = ?', [$this->tid]);
+        $this->db->update('ap_consignments', ['port_of_loading' => 'Auckland'], 'container_no = ?', ['MSKU0000001']);
+        ApSettings::set('certificate_additional_declarations', 'Treated at the stated place.');
+        ApCertificates::issueEligible($this->tid, $this->utc('2026-12-11 13:00:00'));
+        $d = ApCertificates::data($this->tcs[0]);
+        $this->assertSame(['commodity', 'packaging'], $d['targets']);
+        $this->assertSame('Auckland', $d['consignment']['port_of_loading']);
+        $this->assertSame('1 Wharf Rd', $d['place_parts']['street']);
+        $this->assertSame('Lautoka', $d['place_parts']['suburb']);
+        $this->assertSame('Treated at the stated place.', $d['additional_declarations']);
+        $this->assertTrue(array_key_exists('accreditation_no', $d));
+        $this->assertStringStartsWith('%PDF', ApCertificateRenderer::render($d));
+    }
+
     public function testCustomerGetsOneEmailWithAPdfPerCertificate(): void
     {
         ApCertificates::issueEligible($this->tid, $this->utc('2026-12-11 13:00:00'));

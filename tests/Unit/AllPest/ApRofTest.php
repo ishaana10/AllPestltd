@@ -62,6 +62,16 @@ final class ApRofTest extends TestCase
         $this->assertContains('treatment.rof_details', $this->audit);
     }
 
+    public function testPortOfLoadingIsStoredOnTheTreatmentsConsignments(): void
+    {
+        ApRof::saveDetails($this->tid, ['port_of_loading' => ' Auckland ']);
+        $this->assertSame('Auckland', ApRof::document($this->tid)['B']['port_of_loading']);
+        $this->assertSame('Auckland', $this->db->fetchOne("SELECT port_of_loading AS p FROM ap_consignments WHERE container_no = 'MSKU0000001'")['p']);
+        $this->assertSame(null, $this->db->fetchOne("SELECT port_of_loading AS p FROM ap_consignments WHERE container_no = 'MSKU0000002'")['p']);
+        ApRof::saveDetails($this->tid, ['port_of_loading' => '']);
+        $this->assertSame('', ApRof::document($this->tid)['B']['port_of_loading']);
+    }
+
     public function testNotSuitableNeedsARemedialAction(): void
     {
         try { ApRof::saveDetails($this->tid, ['suitable' => '0']); $this->fail('expected refusal'); } catch (InvalidArgumentException $e) { $this->assertStringContainsString('remedial action', $e->getMessage()); }

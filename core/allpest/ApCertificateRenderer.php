@@ -15,28 +15,43 @@ final class ApCertificateRenderer
         $a = $d['applied'] ?? [];
         $t = $d['times'] ?? [];
 
+        $sec = fn (string $t): string => '<p style="font-size:11pt"><b>' . $e($t) . '</b></p>';
+        $box = fn (string $label, bool $on): string => ($on ? '[X] ' : '[ ] ') . $e($label);
+        $targets = (array)($d['targets'] ?? []);
+        $enc = (string)($d['enclosure_type'] ?? '');
+        $pp = $d['place_parts'] ?? [];
         $html = '<h2 style="text-align:center">' . $e($d['provider']['name'] ?? '') . '</h2>'
             . '<p style="text-align:center">' . nl2br($e($d['provider']['address'] ?? '')) . '</p>'
-            . '<h3 style="text-align:center">Methyl bromide fumigation certificate</h3>'
-            . '<table border="1" cellpadding="4">'
-            . $row('Certificate number', $d['number'] ?? '') . $row('Date of issue', $d['issued_at'] ?? '')
-            . $row('Treatment provider ID', $d['provider']['provider_id'] ?? '') . $row('Request reference', $d['request_reference'] ?? '')
-            . $row('Client', trim(($d['client']['name'] ?? '') . "\n" . ($d['client']['address'] ?? '')))
-            . $row('Container number', $c['container_no'] ?? '') . $row('Seal number', $c['seal_no'] ?? '')
-            . $row('Commodity', $c['commodity'] ?? '') . $row('Origin', $c['origin'] ?? '') . $row('Destination', $c['destination'] ?? '') . $row('Quantity', $c['quantity'] ?? '')
-            . $row('Target', $d['target'] ?? '') . $row('Enclosure', ($d['enclosure_type'] ?? '') . ' (' . ($d['fumigation_type'] ?? '') . ')') . $row('Place of treatment', $d['place'] ?? '')
-            . $row('Schedule', ($s['name'] ?? '') . ': ' . ($s['dose_rate'] ?? '') . ' g/m3, ' . ($s['exposure_hours'] ?? '') . ' h, minimum ' . ($s['min_temp_c'] ?? '') . ' C')
-            . $row('Applied', ($a['dose_rate_used'] ?? '') . ' g/m3 (' . ($a['applied_g'] ?? '') . ' g in ' . ($a['volume_m3'] ?? '') . ' m3), exposure ' . ($a['exposure_hours'] ?? '') . ' h, forecast minimum ' . ($a['forecast_min_c'] ?? '') . ' C')
-            . $row('Exposure started', ($t['start_point_at'] ?? '') . ' (Fiji time)') . $row('Ventilation started', ($t['ventilation_at'] ?? '') . ' (Fiji time)')
-            . $row('Final TLV reading', ($d['tlv_ppm'] ?? '') . ' ppm at ' . ($d['tlv_at'] ?? ''))
-            . '</table><p>' . $e($d['declaration'] ?? '') . '</p><table border="0" cellpadding="4"><tr>';
-        foreach (['fumigator' => 'Fumigator-in-charge', 'officer' => 'Supervising Biosecurity officer'] as $role => $label) {
-            $sig = $d['signatures'][$role] ?? [];
-            $img = $d['_assets'][$role . '_png'] ?? null;
-            $html .= '<td width="50%"><b>' . $e($label) . '</b><br/>' . ($img && is_file($img) ? '<img src="' . $e($img) . '" height="40"/><br/>' : '<br/><br/>')
-                . $e($sig['name'] ?? '') . '<br/>' . $e($sig['designation'] ?? '') . '<br/>Signed ' . $e($sig['signed_at'] ?? '') . ' (Fiji time)</td>';
+            . '<p>Date issued (dd/mm/yyyy): <b>' . $e($d['issued_at'] ?? '') . '</b></p>'
+            . '<h3 style="text-align:center">Treatment certificate – Methyl bromide fumigation</h3>'
+            . '<table border="1" cellpadding="4">' . $row('Certificate number', $d['number'] ?? '') . $row('Treatment provider ID number', $d['provider']['provider_id'] ?? '') . $row('Job reference', $d['request_reference'] ?? '') . '</table>'
+            . $sec('Consignment details') . '<table border="1" cellpadding="4">'
+            . $row('Consignment link (container numbers)', $c['container_no'] ?? '') . $row('Seal number(s)', $c['seal_no'] ?? '')
+            . $row('Client name', $d['client']['name'] ?? '') . $row('Client address', $d['client']['address'] ?? '')
+            . $row('Commodity description', $c['commodity'] ?? '') . $row('Commodity country of origin', $c['origin'] ?? '') . $row('Commodity quantity', $c['quantity'] ?? '')
+            . $row('Port of loading', $c['port_of_loading'] ?? '') . $row('Destination country', $c['destination'] ?? '') . '</table>'
+            . '<table border="1" cellpadding="4"><tr><td width="50%"><b>Target of fumigation</b><br/>' . $box('Commodity', in_array('commodity', $targets, true)) . '<br/>' . $box('Container', in_array('container', $targets, true)) . '<br/>'
+            . $box('Packaging', in_array('packaging', $targets, true)) . '<br/>' . $box('Other: ' . ($d['target_other'] ?? ''), in_array('other', $targets, true)) . '</td>'
+            . '<td width="50%"><b>Enclosure type</b><br/>' . $box('Sheeted enclosure', in_array($enc, ['sheeted', 'container_stack'], true)) . '<br/>' . $box('Fumigation chamber', $enc === 'chamber') . '<br/>'
+            . $box('Un-sheeted container', $enc === 'container') . '<br/>' . $box('Other: ' . ($d['enclosure_other'] ?? ''), $enc === 'other') . '</td></tr></table>'
+            . $sec('Treatment schedule (prescribed / specified treatment schedule)') . '<table border="1" cellpadding="4">'
+            . $row('Dose rate (g/m3)', $s['dose_rate'] ?? '') . $row('Exposure period (hours)', $s['exposure_hours'] ?? '') . $row('Temperature (C)', $s['min_temp_c'] ?? '') . '</table>'
+            . $sec('Fumigation details (treatment applied)') . '<table border="1" cellpadding="4">'
+            . $row('Applied dose rate (g/m3)', $a['dose_rate_used'] ?? '') . $row('Exposure period (hours)', $a['exposure_hours'] ?? '') . $row('Temperature (C), forecast minimum', $a['forecast_min_c'] ?? '')
+            . $row('Place of fumigation: street address', $pp['street'] ?? '') . $row('Suburb / town / city', $pp['suburb'] ?? '') . $row('Country / postcode', trim(($pp['country'] ?? '') . ' ' . ($pp['postcode'] ?? '')))
+            . $row('Date and time fumigation commenced', ($t['start_point_at'] ?? '') . ' (Fiji time)') . $row('Date and time fumigation completed', ($t['ventilation_at'] ?? '') . ' (Fiji time)')
+            . $row('Final TLV reading (ppm)', ($d['tlv_ppm'] ?? '') . ' at ' . ($d['tlv_at'] ?? '')) . '</table>'
+            . $sec('Declaration') . '<p>I, the fumigator-in-charge declare:</p><p>' . nl2br($e($d['declaration'] ?? '')) . '</p>';
+        $sig = $d['signatures']['fumigator'] ?? [];
+        $img = $d['_assets']['fumigator_png'] ?? null;
+        $html .= '<table border="1" cellpadding="4"><tr><td width="34%" style="background-color:#eef2ee"><b>Signature</b></td><td width="66%">' . ($img && is_file($img) ? '<img src="' . $e($img) . '" height="40"/>' : '<br/><br/>') . '</td></tr>'
+            . $row('Full name', $sig['name'] ?? '') . $row('Date (dd/mm/yyyy)', $sig['signed_at'] ?? '') . $row('Accreditation number', $d['accreditation_no'] ?? '') . '</table>';
+        $osig = $d['signatures']['officer'] ?? [];
+        if ($osig) {
+            $oimg = $d['_assets']['officer_png'] ?? null;
+            $html .= '<p><b>Supervising Biosecurity officer</b><br/>' . ($oimg && is_file($oimg) ? '<img src="' . $e($oimg) . '" height="40"/><br/>' : '') . $e($osig['name'] ?? '') . ', ' . $e($osig['designation'] ?? '') . ' - signed ' . $e($osig['signed_at'] ?? '') . ' (Fiji time)</p>';
         }
-        $html .= '</tr></table>';
+        if (trim((string)($d['additional_declarations'] ?? '')) !== '') { $html .= $sec('Additional declarations') . '<p>' . nl2br($e($d['additional_declarations'])) . '</p>'; }
 
         $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
         $pdf->SetCreator('All Pest');

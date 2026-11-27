@@ -61,11 +61,22 @@ final class ApRof
         if ($m['load_factor_est'] !== null && $m['load_factor_max'] !== null && (float)$m['load_factor_est'] > (float)$m['load_factor_max']) { throw new InvalidArgumentException('The estimated load factor is above the maximum.'); }
         if (in_array('other', explode(',', (string)($m['target_of_fumigation'] ?? '')), true) && trim((string)($m['target_other'] ?? '')) === '') { throw new InvalidArgumentException('Describe the other target of fumigation.'); }
         if ((string)($m['enclosure_type'] ?? '') === 'other' && trim((string)($m['enclosure_other'] ?? '')) === '') { throw new InvalidArgumentException('Describe the other enclosure type.'); }
-        if (!$set) { return []; }
+        $port = null;
+        if (array_key_exists('port_of_loading', $in)) {
+            $port = trim((string)$in['port_of_loading']);
+            if (mb_strlen($port) > 100) { throw new InvalidArgumentException('Port of loading is too long (limit 100 characters).'); }
+        }
+        if (!$set && $port === null) { return []; }
+        if ($port !== null) {
+            $db->exec("UPDATE ap_consignments SET port_of_loading = " . ($port === '' ? 'NULL' : $db->getPdo()->quote($port)) . " WHERE id IN (SELECT consignment_id FROM ap_treatment_containers WHERE treatment_id = " . $db->getPdo()->quote($treatmentId) . ")");
+            $set['port_of_loading'] = 'applied';
+        }
         $set['updated_at'] = gmdate('Y-m-d H:i:s');
+        $fields = array_keys($set);
+        unset($set['port_of_loading']);
         $db->update('ap_treatments', $set, 'id = ?', [$treatmentId]);
-        ApTreatments::audit('treatment.rof_details', $treatmentId, ['fields' => array_keys($set), 'user' => $userId]);
-        return array_keys($set);
+        ApTreatments::audit('treatment.rof_details', $treatmentId, ['fields' => $fields, 'user' => $userId]);
+        return $fields;
     }
 
     /** One row of perishable temperature readings: values by probe number (1 to 7), taken at a time, initialled. */
@@ -130,7 +141,7 @@ final class ApRof
             'B' => [
                 'provider_id' => (string)ApSettings::get('treatment_provider_id', ''), 'client' => trim((string)($r['customer_name'] ?? '') . "\n" . (string)($r['customer_address'] ?? '')),
                 'job_no' => $r['reference'] ?? '', 'street' => $t['loc_street'] ?? ($r['site_address'] ?? ''), 'suburb' => $t['loc_suburb'] ?? '', 'country' => $t['loc_country'] ?? '', 'postcode' => $t['loc_postcode'] ?? '',
-                'description' => $t['consignment_description'] ?? '', 'targets' => array_values(array_filter(explode(',', (string)($t['target_of_fumigation'] ?? '')))), 'target_other' => $t['target_other'] ?? '',
+                'description' => $t['consignment_description'] ?? '', 'port_of_loading' => (string)($containers[0]['port_of_loading'] ?? ''), 'targets' => array_values(array_filter(explode(',', (string)($t['target_of_fumigation'] ?? '')))), 'target_other' => $t['target_other'] ?? '',
                 'containers' => $containers,
             ],
             'C' => [

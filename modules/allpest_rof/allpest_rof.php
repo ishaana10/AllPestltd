@@ -73,6 +73,7 @@ if (!ApAccess::can($uid, 'admin.pages') && !ApAccess::can($uid, 'treatment.recor
       '<tr>' + lbl('Job identification number', v(B.job_no)) + lbl('Description of consignment', '<textarea id="f_consignment_description" rows="2"' + (dis ? ' disabled' : '') + '>' + v(B.description) + '</textarea>') + '</tr>' +
       '<tr>' + lbl('Street address', inp('f_loc_street', B.street)) + lbl('Target of fumigation', tg('commodity', 'Commodity') + tg('container', 'Container') + tg('packaging', 'Packaging') + tg('other', 'Other') + inp('f_target_other', B.target_other)) + '</tr>' +
       '<tr>' + lbl('Suburb / town / city', inp('f_loc_suburb', B.suburb)) + lbl('Country / postcode', inp('f_loc_country', B.country) + inp('f_loc_postcode', B.postcode)) + '</tr>' +
+      '<tr>' + lbl('Port of loading', inp('f_port_of_loading', B.port_of_loading)) + '<td></td></tr>' +
       '<tr><td colspan="2"><span class="lbl">Consignment identification / container numbers</span>' + B.containers.map(function (c) { return v(c.container_no) + (c.seal_no ? ' (seal ' + v(c.seal_no) + ')' : ''); }).join(', ') + '</td></tr></table>';
     var enc = Object.keys({sheeted: 1, chamber: 1, container: 1, container_stack: 1, other: 1}).map(function (k) { var t = {sheeted: 'Sheeted enclosure', chamber: 'Fumigation chamber', container: 'Un-sheeted container(s)', container_stack: 'Stack of containers under sheet', other: 'Other'}[k]; return (C.enclosure_type === k ? '<strong>' + t + '</strong>' : t); }).join(' / ');
     h += '<table><tr><th class="sec" colspan="4">Section C: Fumigation details</th></tr>' +
@@ -118,7 +119,7 @@ if (!ApAccess::can($uid, 'admin.pages') && !ApAccess::can($uid, 'treatment.recor
   }
   function radio(n) { var el = document.querySelector('input[name="' + n + '"]:checked'); return el ? el.value : ''; }
   function saveDetails() {
-    var f = {consignment_description: $('f_consignment_description').value, loc_street: $('f_loc_street').value, loc_suburb: $('f_loc_suburb').value, loc_country: $('f_loc_country').value, loc_postcode: $('f_loc_postcode').value,
+    var f = {consignment_description: $('f_consignment_description').value, loc_street: $('f_loc_street').value, loc_suburb: $('f_loc_suburb').value, loc_country: $('f_loc_country').value, loc_postcode: $('f_loc_postcode').value, port_of_loading: $('f_port_of_loading').value,
       target_other: $('f_target_other').value, enclosure_other: $('f_enclosure_other').value, remedial_action: $('f_remedial_action').value, suitable: radio('f_suitable'), heaters_used: radio('f_heaters_used'),
       min_enclosure_temp_c: $('f_min_enclosure_temp_c').value, target_of_fumigation: Array.prototype.map.call(document.querySelectorAll('.tg:checked'), function (c) { return c.value; })};
     ['probe_location', 'load_factor_max', 'load_factor_est', 'retention_pct', 'ct_product'].forEach(function (k) { var el = $('f_' + k); if (el) { f[k] = el.value; } });
