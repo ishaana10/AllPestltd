@@ -39,7 +39,7 @@ try {
         case 'audit':
             require_once dirname(__DIR__, 2) . '/core/allpest/ApAudit.php';
             $a = ApAudit::audit();
-            $rows = $a->getLogs(['from' => $from->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s'), 'to' => $to->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s'), 'q' => 'ap_'], 500, 0);
+            $rows = $a->getLogs(['from' => $from->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s'), 'to' => $to->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s')], 3000, 0);
             $rows = array_values(array_filter($rows, static fn ($r) => str_starts_with((string)$r['audit_table'], 'ap_')));
             $data = ['chain' => $a->verifyChain(), 'rows' => array_map(static fn ($r) => ['when' => $r['audit_timestamp'], 'user' => $r['audit_username'], 'action' => $r['audit_action'], 'summary' => $r['audit_summary'], 'status' => $r['audit_status']], $rows)];
             if (($_GET['format'] ?? '') === 'csv') { $data = $data['rows']; }

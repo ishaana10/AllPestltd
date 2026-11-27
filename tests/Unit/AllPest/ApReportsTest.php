@@ -149,6 +149,7 @@ final class ApReportsTest extends TestCase
         $mod = (string)file_get_contents($root . '/modules/allpest_dashboard/allpest_dashboard.php');
         $this->assertTrue(str_contains($api, "guard('admin.reports')"));
         foreach (['summary', 'monthly', 'fumigations', 'inventory', 'invoices', 'technicians', 'audit', 'csv'] as $w) { $this->assertTrue(str_contains($api, $w), $w); }
+        $this->assertFalse(str_contains($api, "'q' =>"), 'the audit text filter breaks on MySQL (ESCAPE backslash): filter in PHP instead');
         $this->assertTrue(str_contains($mod, "'admin.reports'"));
         $this->assertFalse(str_contains($mod, 'alert('));
     }
