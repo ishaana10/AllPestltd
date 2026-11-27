@@ -82,6 +82,15 @@ final class ApUploadsTest extends TestCase
         $this->assertSame('image/jpeg', $row['mime']);
     }
 
+    public function testHugePixelDimensionsAreRejectedBeforeDecoding(): void
+    {
+        // A tiny PNG whose header claims 20000 x 20000 pixels (a decompression bomb): must be refused without decoding it.
+        $ihdr = pack('NN', 20000, 20000) . "\x08\x02\x00\x00\x00";
+        $png = "\x89PNG\r\n\x1a\n" . pack('N', 13) . 'IHDR' . $ihdr . pack('N', crc32('IHDR' . $ihdr)) . pack('N', 0) . 'IEND' . pack('N', crc32('IEND'));
+        $this->expectException(ApUploadRejected::class);
+        ApUploads::store($this->phpFile($png, 'bomb.png'), 'reading_photo', 'u', 'd');
+    }
+
     public function testTextFileRenamedJpgIsRejected(): void
     {
         $this->expectException(ApUploadRejected::class);

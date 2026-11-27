@@ -17,6 +17,7 @@ final class ApUploads
     public const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
     public const MAX_PDF_BYTES = 5 * 1024 * 1024;
     public const LONG_EDGE = 1600;
+    public const MAX_PIXELS = 50000000;   // refuse decompression bombs before decoding (a 12 MP phone photo is well inside)
     public const QUALITY = 75;
 
     private static ?object $db = null;
@@ -137,6 +138,10 @@ final class ApUploads
 
     private static function compressImage(string $raw, string $kind): string
     {
+        $info = @getimagesizefromstring($raw);
+        if ($info === false || $info[0] < 1 || $info[1] < 1 || $info[0] * $info[1] > self::MAX_PIXELS) {
+            throw new ApUploadRejected('The image is too large in pixels (limit ' . (int)(self::MAX_PIXELS / 1000000) . ' megapixels) or could not be read.');
+        }
         $im = @imagecreatefromstring($raw);
         if ($im === false) {
             throw new ApUploadRejected('The image could not be read.');
