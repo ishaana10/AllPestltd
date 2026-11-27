@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 /**
  * The All Pest dashboard and reports are ordinary studio records, not code: dashboard tiles and charts are rows in
- * nu_dashboard_widgets (edited in the studio's widget designer) and the report tables are rows in nu_reports (edited in Reports).
+ * nu_dashboard_widgets (edited in the studio's widget designer) and the report tables are rows in nu_reports (edited in Reports). The dashboard holds only KPI tiles and charts; the tables live in Reports.
  * This class only seeds them the first time. A record that already exists is never touched, so a developer's changes survive updates.
  *
  * Widget SQL may use the studio macros {{days_ago_7|30|90|365}}, {{days_ahead_30}}, {{today}}, {{this_month}}, {{this_year}}.
@@ -39,10 +39,6 @@ final class ApDashboard
             $w('chart_mb', 'chart_bar', 'Methyl bromide used per month (kg)', 2, 2, ['sql' => "SELECT SUBSTR(closed_at, 1, 7) AS label, ROUND(SUM(COALESCE(applied_g, 0) + COALESCE(topup_g, 0)) / 1000.0) AS value FROM ap_treatments WHERE status = 'closed' AND closed_at >= '{{days_ago_365}}' GROUP BY SUBSTR(closed_at, 1, 7) ORDER BY label"]),
             $w('chart_invoices', 'chart_doughnut', 'Invoice value by status', 2, 2, ['sql' => 'SELECT status AS label, ROUND(SUM(total)) AS value FROM ap_invoices GROUP BY status ORDER BY status']),
             $w('chart_stock', 'chart_bar', 'Gas stock by lot (kg)', 2, 2, ['sql' => 'SELECT l.lot_ref AS label, ROUND(COALESCE(SUM(m.grams), 0) / 1000.0) AS value FROM ap_stock_lots l LEFT JOIN ap_stock_movements m ON m.lot_id = l.id GROUP BY l.lot_ref ORDER BY l.lot_ref']),
-
-            $w('table_latest', 'table', 'Latest fumigations', 4, 2, ['sql' => "SELECT t.rof_no AS ROF, c.container_no AS Container, tc.result AS Result, SUBSTR(t.closed_at, 1, 10) AS Closed FROM ap_treatment_containers tc JOIN ap_treatments t ON t.id = tc.treatment_id JOIN ap_consignments c ON c.id = tc.consignment_id WHERE t.status = 'closed' ORDER BY t.closed_at DESC LIMIT 8"]),
-            $w('table_low_stock', 'table', 'Lots below 5 kg', 2, 1, ['sql' => 'SELECT l.lot_ref AS Lot, ROUND(COALESCE(SUM(m.grams), 0)) AS Grams FROM ap_stock_lots l LEFT JOIN ap_stock_movements m ON m.lot_id = l.id GROUP BY l.lot_ref HAVING COALESCE(SUM(m.grams), 0) < 5000 ORDER BY Grams']),
-            $w('table_registrations', 'table', 'Technician registrations expiring within 30 days', 2, 1, ['sql' => "SELECT full_name AS Technician, registration_no AS Registration, registration_expiry AS Expires FROM ap_technicians WHERE status = 'active' AND (registration_expiry IS NULL OR registration_expiry <= '{{days_ahead_30}}') ORDER BY registration_expiry"]),
         ];
     }
 
@@ -50,22 +46,26 @@ final class ApDashboard
     public static function reports(): array
     {
         $flt = static fn (string $field, string $label, string $op = 'LIKE'): array => ['field' => $field, 'label' => $label, 'type' => 'text', 'operator' => $op];
+        $range = static fn (string $field): array => [
+            ['field' => $field, 'param' => 'from', 'label' => 'From', 'type' => 'date', 'operator' => '>='],
+            ['field' => $field, 'param' => 'to', 'label' => 'To', 'type' => 'date', 'operator' => '<='],
+        ];
         return [
-            ['code' => 'ap_fumigations', 'name' => 'All Pest: Fumigations (one row per container)', 'filters' => [$flt('closed_month', 'Month (YYYY-MM)'), $flt('result', 'Result', '='), $flt('customer', 'Customer'), $flt('technician', 'Technician')],
-                'sql' => "SELECT SUBSTR(t.closed_at, 1, 10) AS closed_date, SUBSTR(t.closed_at, 1, 7) AS closed_month, t.rof_no, r.reference AS request_no, r.customer_name AS customer, c.container_no, t.rof_type, tc.result, tc.tlv_ppm, t.dose_g, t.applied_g, tech.full_name AS technician, cert.number AS certificate_no
+            ['code' => 'ap_fumigations', 'name' => 'All Pest: Fumigations (one row per container)', 'filters' => [...$range('closed_date'), $flt('result', 'Result', '='), $flt('customer', 'Customer'), $flt('technician', 'Technician')],
+                'sql' => "SELECT SUBSTR(t.closed_at, 1, 10) AS closed_date, t.rof_no, r.reference AS request_no, r.customer_name AS customer, c.container_no, t.rof_type, tc.result, tc.tlv_ppm, t.dose_g, t.applied_g, tech.full_name AS technician, cert.number AS certificate_no
                           FROM ap_treatment_containers tc JOIN ap_treatments t ON t.id = tc.treatment_id JOIN ap_consignments c ON c.id = tc.consignment_id JOIN ap_requests r ON r.id = t.request_id
                           LEFT JOIN ap_technicians tech ON tech.id = t.technician_id LEFT JOIN ap_certificates cert ON cert.container_id = tc.id WHERE t.status = 'closed' ORDER BY t.closed_at DESC, t.rof_no, c.container_no"],
             ['code' => 'ap_inventory', 'name' => 'All Pest: Gas inventory by lot', 'filters' => [$flt('lot_ref', 'Lot')],
                 'sql' => "SELECT l.lot_ref, l.description, ROUND(COALESCE(SUM(m.grams), 0), 1) AS balance_g, ROUND(COALESCE(SUM(CASE WHEN m.kind = 'receive' THEN m.grams ELSE 0 END), 0), 1) AS received_g,
                           ROUND(COALESCE(SUM(CASE WHEN m.kind = 'consume' THEN -m.grams ELSE 0 END), 0), 1) AS consumed_g, ROUND(COALESCE(SUM(CASE WHEN m.kind = 'adjust' THEN m.grams ELSE 0 END), 0), 1) AS adjusted_g,
                           COALESCE(SUM(CASE WHEN m.discrepancy = 1 THEN 1 ELSE 0 END), 0) AS discrepancies FROM ap_stock_lots l LEFT JOIN ap_stock_movements m ON m.lot_id = l.id GROUP BY l.id, l.lot_ref, l.description ORDER BY l.lot_ref"],
-            ['code' => 'ap_stock_ledger', 'name' => 'All Pest: Stock ledger (every movement)', 'filters' => [$flt('month', 'Month (YYYY-MM)'), $flt('kind', 'Kind', '='), $flt('lot_ref', 'Lot')],
-                'sql' => "SELECT m.created_at, SUBSTR(m.created_at, 1, 7) AS month, l.lot_ref, m.kind, m.grams, m.discrepancy, m.reason, m.user_id FROM ap_stock_movements m LEFT JOIN ap_stock_lots l ON l.id = m.lot_id ORDER BY m.created_at DESC"],
-            ['code' => 'ap_invoices', 'name' => 'All Pest: Invoices', 'filters' => [$flt('month', 'Month (YYYY-MM)'), $flt('status', 'Status', '='), $flt('customer', 'Customer')],
-                'sql' => "SELECT i.invoice_no, SUBSTR(i.created_at, 1, 7) AS month, r.reference AS request_no, i.customer_name AS customer, i.status, i.subtotal, i.tax_amount, i.discount, i.total, i.erpx_invoice_no, i.verified_by, i.posted_at, i.last_error
+            ['code' => 'ap_stock_ledger', 'name' => 'All Pest: Stock ledger (every movement)', 'filters' => [...$range('created_date'), $flt('kind', 'Kind', '='), $flt('lot_ref', 'Lot')],
+                'sql' => "SELECT m.created_at, SUBSTR(m.created_at, 1, 10) AS created_date, l.lot_ref, m.kind, m.grams, m.discrepancy, m.reason, m.user_id FROM ap_stock_movements m LEFT JOIN ap_stock_lots l ON l.id = m.lot_id ORDER BY m.created_at DESC"],
+            ['code' => 'ap_invoices', 'name' => 'All Pest: Invoices', 'filters' => [...$range('created_date'), $flt('status', 'Status', '='), $flt('customer', 'Customer')],
+                'sql' => "SELECT i.invoice_no, SUBSTR(i.created_at, 1, 10) AS created_date, r.reference AS request_no, i.customer_name AS customer, i.status, i.subtotal, i.tax_amount, i.discount, i.total, i.erpx_invoice_no, i.verified_by, i.posted_at, i.last_error
                           FROM ap_invoices i JOIN ap_requests r ON r.id = i.request_id ORDER BY i.created_at DESC"],
-            ['code' => 'ap_certificates', 'name' => 'All Pest: Certificates', 'filters' => [$flt('month', 'Month (YYYY-MM)'), $flt('container_no', 'Container')],
-                'sql' => "SELECT cert.number, SUBSTR(cert.issued_at, 1, 7) AS month, cert.issued_at, c.container_no, t.rof_no, r.reference AS request_no, cert.emailed_at, cert.email_pending
+            ['code' => 'ap_certificates', 'name' => 'All Pest: Certificates', 'filters' => [...$range('issued_date'), $flt('container_no', 'Container')],
+                'sql' => "SELECT cert.number, SUBSTR(cert.issued_at, 1, 10) AS issued_date, cert.issued_at, c.container_no, t.rof_no, r.reference AS request_no, cert.emailed_at, cert.email_pending
                           FROM ap_certificates cert JOIN ap_treatment_containers tc ON tc.id = cert.container_id JOIN ap_consignments c ON c.id = tc.consignment_id JOIN ap_treatments t ON t.id = cert.treatment_id JOIN ap_requests r ON r.id = t.request_id ORDER BY cert.number DESC"],
             ['code' => 'ap_technicians', 'name' => 'All Pest: Technicians and registrations', 'filters' => [$flt('full_name', 'Technician')],
                 'sql' => "SELECT tech.full_name, tech.registration_no, tech.registration_expiry, tech.status, (SELECT COUNT(*) FROM ap_treatments x WHERE x.technician_id = tech.id AND x.status = 'closed') AS rofs_closed FROM ap_technicians tech ORDER BY tech.full_name"],

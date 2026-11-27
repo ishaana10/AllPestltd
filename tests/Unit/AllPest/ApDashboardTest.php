@@ -86,8 +86,20 @@ final class ApDashboardTest extends TestCase
         $this->assertEquals(40, $by['allpest.mb_used'][0]['value']);
         $this->assertEquals(3, $by['allpest.stock_kg'][0]['value']);
         $this->assertEquals(1, $by['allpest.invoices_draft'][0]['value']);
-        $this->assertSame('LOT-1', $by['allpest.table_low_stock'][0]['Lot']);                     // 3,000 g is under 5 kg
-        $this->assertSame('Demo Technician', $by['allpest.table_registrations'][0]['Technician']); // registration expired in 2020
+    }
+
+    public function testDashboardHoldsOnlyKpisAndCharts(): void
+    {
+        foreach (ApDashboard::widgets() as $w) { $this->assertTrue(in_array($w['type'], ['stat', 'chart_bar', 'chart_stacked', 'chart_doughnut'], true), $w['key'] . ' is ' . $w['type']); }
+    }
+
+    public function testReportsFilterByDateRangeNotJustText(): void
+    {
+        foreach (ApDashboard::reports() as $r) {
+            if ($r['code'] === 'ap_technicians' || $r['code'] === 'ap_inventory') { continue; }
+            $params = array_column(array_filter($r['filters'], fn ($f) => ($f['type'] ?? '') === 'date'), 'param');
+            $this->assertSame(['from', 'to'], $params, $r['code']);
+        }
     }
 
     public function testProvisionSeedsBothRolesAndReportsOnceAndNeverOverwritesDeveloperEdits(): void
@@ -114,7 +126,9 @@ final class ApDashboardTest extends TestCase
         $this->assertArrayHasKey('dashboard', $m);
         $this->assertArrayHasKey('reports', $m);
         $this->assertFalse(isset($m['allpest_dashboard']));
-        $this->assertFalse(is_dir($root . '/modules/allpest_dashboard'));
+        $shim = (string)file_get_contents($root . '/modules/allpest_dashboard/allpest_dashboard.php');
+        $this->assertTrue(str_contains($shim, "loadModule('dashboard')") && str_contains($shim, 'ApForms::provision'), 'the stale menu entry refreshes the menu and opens the studio dashboard');
+        $this->assertTrue(str_contains((string)file_get_contents($root . '/assets/js/nubuilder-next.js'), "'allpest_dashboard'"), 'the shell still knows the stale entry');
         $this->assertFalse(is_file($root . '/api/allpest/reports.php'));
         $js = (string)file_get_contents($root . '/assets/js/nu-widgets.js');
         $this->assertTrue(str_contains($js, 'cfg.series') && str_contains($js, 'stacked'), 'the chart renderer draws multi-series stacked bars');
