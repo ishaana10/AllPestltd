@@ -57,7 +57,7 @@ final class ApAccess
         );
     }
 
-    /** Create the two roles, their permissions and the sidebar entry. Safe to run repeatedly. */
+    /** Create the two roles and their permissions (the forms and sidebar entries come from ApForms::provision). Safe to run repeatedly. */
     public static function install(object $db, int $projectId = 1): void
     {
         $perm = [];
@@ -76,13 +76,6 @@ final class ApAccess
                     $db->insert('nu_role_permissions', ['rp_role_id' => $rid, 'rp_perm_id' => $perm[$p]]);
                 }
             }
-        }
-        if (!$db->fetchOne("SELECT menu_id FROM nu_menus WHERE menu_target = 'allpest' AND project_id = ?", [$projectId])) {
-            $db->insert('nu_menus', [
-                'menu_label' => 'All Pest', 'menu_type' => 'module', 'menu_target' => 'allpest', 'menu_parent_id' => 0, 'menu_order' => 20,
-                'menu_roles' => 'globeadmin,ap_admin,ap_technician', 'menu_role_access' => '["globeadmin","ap_admin","ap_technician"]', 'menu_active' => 1, 'menu_icon' => 'clipboard',
-                'menu_open_mode' => 'inline|browse', 'menu_browse_mode' => 'inline', 'menu_preview_mode' => 'inline', 'menu_default_view' => 'browse', 'project_id' => $projectId,
-            ]);
         }
     }
 }

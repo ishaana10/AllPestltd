@@ -102,9 +102,6 @@ final class ApAccessTest extends TestCase
         $perms = fn (string $role) => array_column($this->db->fetchAll('SELECT p.perm_code FROM nu_permissions p JOIN nu_role_permissions rp ON rp.rp_perm_id = p.perm_id JOIN nu_roles r ON r.role_id = rp.rp_role_id WHERE r.role_code = ? ORDER BY 1', [$role]), 'perm_code');
         $this->assertSame(['allpest.admin', 'allpest.field'], $perms('ap_admin'));
         $this->assertSame(['allpest.field'], $perms('ap_technician'));
-        $this->assertSame(1, (int)$this->db->fetchOne("SELECT COUNT(*) AS n FROM nu_menus WHERE menu_target = 'allpest'")['n']);
-        $m = $this->db->fetchOne("SELECT * FROM nu_menus WHERE menu_target = 'allpest'");
-        $this->assertStringContainsString('ap_technician', (string)$m['menu_role_access']);
     }
 
     /** @return string[] */
