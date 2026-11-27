@@ -98,14 +98,53 @@ function nu_get_table_columns($table) {
     }
 }
 
+/** Column type and nullability, from DESCRIBE: col => ['type' => 'date', 'null' => true]. Empty when the table cannot be described. */
+function nu_get_column_meta($table) {
+    static $cache = [];
+    if (isset($cache[$table])) return $cache[$table];
+    try {
+        $meta = [];
+        foreach (nu_q("DESCRIBE `{$table}`")->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $meta[$row['Field']] = ['type' => strtolower((string)$row['Type']), 'null' => strtoupper((string)($row['Null'] ?? '')) === 'YES'];
+        }
+        return $cache[$table] = $meta;
+    } catch (Throwable $e) {
+        return $cache[$table] = [];
+    }
+}
+
 function nu_filter_save_to_columns($save, $table, $pk) {
     $cols = nu_get_table_columns($table);
     if (empty($cols)) return $save;
+    $meta = nu_get_column_meta($table);
     $out = [];
     foreach ($save as $col => $val) {
-        if ($col === $pk || isset($cols[$col])) $out[$col] = $val;
+        if ($col !== $pk && !isset($cols[$col])) continue;
+        // An empty date or number field arrives as '' which MySQL refuses: store NULL, or leave the column to its default when it cannot be NULL.
+        if ($val === '' && $col !== $pk && isset($meta[$col]) && preg_match('/^(date|datetime|timestamp|time|year|tinyint|smallint|mediumint|int|integer|bigint|decimal|numeric|float|double)\b/', $meta[$col]['type'])) {
+            if ($meta[$col]['null']) { $out[$col] = null; }
+            continue;
+        }
+        $out[$col] = $val;
     }
     return $out;
+}
+
+/** Record a data change in the studio audit trail (who, what, when, before and after). Never blocks the save. */
+function nu_audit_change($action, $table, $recordId, $old = null, $new = null) {
+    try {
+        if (!class_exists('NuAudit')) require_once __DIR__ . '/../core/Audit.php';
+        (new NuAudit())->logChange($action, (string)$table, $recordId, is_array($old) ? $old : null, is_array($new) ? $new : null);
+    } catch (Throwable $e) {
+        error_log('[form audit] ' . $e->getMessage());
+    }
+}
+
+function nu_audit_row($table, $pk, $id) {
+    try {
+        $r = nu_q("SELECT * FROM `{$table}` WHERE `{$pk}` = ? LIMIT 1", [$id])->fetch(PDO::FETCH_ASSOC);
+        return $r ?: null;
+    } catch (Throwable $e) { return null; }
 }
 
 function nu_coerce_save_value($value) {
@@ -2541,13 +2580,16 @@ function nu_handle_subform_save() {
         }
         if (!$sets) nu_json(['success' => false, 'error' => 'No fields to update'], 400);
         $params[] = $id;
+        $auditOld = nu_audit_row($table, $pk, $id);
         nu_q("UPDATE `{$table}` SET " . implode(', ', $sets) . " WHERE `{$pk}` = ?", $params);
+        nu_audit_change('update', $table, $id, $auditOld, nu_audit_row($table, $pk, $id) ?: $save);
         nu_json(['success' => true, 'id' => $id]);
     } else {
         $cols = array_keys($save);
         $placeholders = array_fill(0, count($cols), '?');
         nu_q("INSERT INTO `{$table}` (`" . implode('`,`', $cols) . "`) VALUES (" . implode(',', $placeholders) . ")", array_values($save));
         $newId = (!empty($save[$pk])) ? $save[$pk] : (($pkType === 'uuid') ? ($save[$pk] ?? nu_db()->lastInsertId()) : nu_db()->lastInsertId());
+        nu_audit_change('create', $table, $newId, null, nu_audit_row($table, $pk, $newId) ?: $save);
 
         // Auto-start workflow if bound to this form code
         try {
@@ -2609,7 +2651,9 @@ function nu_handle_subform_delete() {
     if ($table === '') nu_json(['success' => false, 'error' => 'No table'], 400);
 
     $pk = nu_get_pk($table);
+    $auditOld = nu_audit_row($table, $pk, $id);
     nu_q("DELETE FROM `{$table}` WHERE `{$pk}` = ?", [$id]);
+    nu_audit_change('delete', $table, $id, $auditOld, null);
     nu_json(['success' => true]);
 }
 
@@ -3099,7 +3143,9 @@ function nu_handle_save() {
         }
         if (!$sets) nu_json(['success' => false, 'error' => 'No fields to update'], 400);
         $params[] = $id;
+        $auditOld = nu_audit_row($table, $pk, $id);
         nu_q("UPDATE `{$table}` SET " . implode(', ', $sets) . " WHERE `{$pk}` = ?", $params);
+        nu_audit_change('update', $table, $id, $auditOld, nu_audit_row($table, $pk, $id) ?: $save);
         $finalId = $id;
 
         // Trigger Outgoing Webhooks for form_update
@@ -3118,6 +3164,7 @@ function nu_handle_save() {
         $placeholders = array_fill(0, count($cols), '?');
         nu_q("INSERT INTO `{$table}` (`" . implode('`,`', $cols) . "`) VALUES (" . implode(',', $placeholders) . ")", array_values($save));
         $finalId = (!empty($save[$pk])) ? $save[$pk] : (($pkType === 'uuid') ? ($save[$pk] ?? nu_db()->lastInsertId()) : nu_db()->lastInsertId());
+        nu_audit_change('create', $table, $finalId, null, nu_audit_row($table, $pk, $finalId) ?: $save);
 
         // Trigger Outgoing Webhooks for form_insert
         try {

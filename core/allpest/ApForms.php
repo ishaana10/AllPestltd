@@ -178,7 +178,7 @@ final class ApForms
             'fs_title' => 'Request a fumigation', 'fs_intro' => 'Tell us where and what to treat. We will confirm the booking by email.', 'fs_submit_label' => 'Send request',
             'fs_success_message' => 'Thank you. Your request has been received and our team will be in touch to confirm.', 'fs_notify_email' => $notifyEmail !== '' ? $notifyEmail : null,
             'fs_confirm_email' => 1, 'fs_email_field' => 'customer_email', 'fs_confirm_message' => 'We have your fumigation request and will confirm the booking shortly.',
-            'fs_fields' => json_encode($fields), 'fs_created_by' => $userId,
+            'fs_fields' => json_encode($fields), 'fs_created_by' => $userId !== null && $userId !== '' ? substr($userId, 0, 32) : null,
         ]);
         return $token;
     }

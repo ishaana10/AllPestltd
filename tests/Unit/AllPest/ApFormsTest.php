@@ -141,4 +141,12 @@ final class ApFormsTest extends TestCase
         $this->assertTrue(is_file(dirname(__DIR__, 3) . '/core/allpest/ApRequests.php'));
         $this->assertStringContainsString(dirname(__DIR__, 3) . '/core/allpest/ApRequests.php', $php);
     }
+
+    public function testShareCreatorFitsTheStudioColumnForUuidUsers(): void
+    {
+        ApForms::provision($this->db, 1);
+        ApForms::provisionPublicShare($this->db, 1, '123e4567-e89b-12d3-a456-426614174000', '');
+        $by = (string)$this->db->fetchOne('SELECT fs_created_by AS c FROM nu_form_shares')['c'];
+        $this->assertTrue(strlen($by) <= 32, 'the studio column is VARCHAR(32)');
+    }
 }
