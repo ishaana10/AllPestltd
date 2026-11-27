@@ -113,6 +113,7 @@ final class ApCertificates
             $e = $db->fetchOne('SELECT name, serial_no FROM ap_equipment WHERE id = ?', [(string)$eid]);
             if ($e) { $equipment[] = ['name' => (string)$e['name'], 'serial_last4' => substr((string)$e['serial_no'], -4)]; }
         }
+        $techRow = $t['technician_id'] ? $db->fetchOne('SELECT accreditation_no, registration_no FROM ap_technicians WHERE id = ?', [$t['technician_id']]) : null;
         $signatures = [];
         $assets = [];
         foreach ($db->fetchAll('SELECT * FROM ap_signatures WHERE treatment_id = ? AND version = ?', [$t['id'], (int)$t['version']]) as $s) {
@@ -127,9 +128,14 @@ final class ApCertificates
             'request_reference' => (string)$req['reference'],
             'client' => ['name' => (string)$req['customer_name'], 'address' => (string)$req['customer_address']],
             'consignment' => ['container_no' => (string)$con['container_no'], 'seal_no' => (string)$con['seal_no'], 'commodity' => (string)$con['commodity'], 'origin' => (string)$con['origin'],
-                'destination' => (string)$con['destination'], 'quantity' => (string)$con['quantity']],
+                'destination' => (string)$con['destination'], 'quantity' => (string)$con['quantity'], 'port_of_loading' => (string)($con['port_of_loading'] ?? '')],
             'target' => (string)ApSettings::get('certificate_target', 'Quarantine pests, as per the schedule'),
-            'enclosure_type' => (string)$t['enclosure_type'], 'fumigation_type' => (string)$t['fumigation_type'], 'place' => (string)$req['site_address'],
+            'targets' => array_values(array_filter(explode(',', (string)($t['target_of_fumigation'] ?? '')))), 'target_other' => (string)($t['target_other'] ?? ''),
+            'enclosure_type' => (string)$t['enclosure_type'], 'enclosure_other' => (string)($t['enclosure_other'] ?? ''), 'fumigation_type' => (string)$t['fumigation_type'],
+            'place' => (string)$req['site_address'],
+            'place_parts' => ['street' => (string)($t['loc_street'] ?? '') !== '' ? (string)$t['loc_street'] : (string)$req['site_address'], 'suburb' => (string)($t['loc_suburb'] ?? ''), 'country' => (string)($t['loc_country'] ?? ''), 'postcode' => (string)($t['loc_postcode'] ?? '')],
+            'accreditation_no' => (string)(($techRow['accreditation_no'] ?? '') !== '' ? $techRow['accreditation_no'] : ($techRow['registration_no'] ?? '')),
+            'additional_declarations' => (string)ApSettings::get('certificate_additional_declarations', ''),
             'schedule' => ['name' => (string)$sched['name'], 'dose_rate' => self::dec($sched['dose_rate']), 'exposure_hours' => self::dec($sched['exposure_hours']), 'min_temp_c' => self::dec($sched['min_temp_c'], 1)],
             'applied' => ['dose_rate_used' => self::dec($t['dose_rate_used']), 'applied_g' => self::dec($t['applied_g']), 'volume_m3' => self::dec($t['volume_m3']),
                 'exposure_hours' => $hours === null ? '' : self::dec($hours), 'forecast_min_c' => self::dec($t['forecast_min_c'], 1),

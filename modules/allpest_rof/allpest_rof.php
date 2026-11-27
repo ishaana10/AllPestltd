@@ -23,6 +23,23 @@ if (!ApAccess::can($uid, 'admin.pages') && !ApAccess::can($uid, 'treatment.recor
 <div class="ap-scope">
   <h1>Record of fumigation</h1>
   <div class="ap-card noprint" id="pick"><h2>Choose a treatment</h2><div id="mine">Loading…</div></div>
+  <div class="ap-card noprint" id="newcard" hidden><h2>Start a new record</h2>
+    <p class="ap-muted" id="needs"></p>
+    <div id="newform">
+      <label class="ap-field"><span>Client name</span><input id="n_name"></label>
+      <label class="ap-field"><span>Client email (optional)</span><input id="n_email" type="email"></label>
+      <label class="ap-field"><span>Client address</span><input id="n_addr"></label>
+      <label class="ap-field"><span>Place of fumigation (site address)</span><input id="n_site"></label>
+      <label class="ap-field"><span>Container numbers (one per line)</span><textarea id="n_cont" rows="3"></textarea></label>
+      <label class="ap-field"><span>Record type</span><select id="n_type"><option value="general">Non-perishable</option><option value="perishable">Perishable</option></select></label>
+      <label class="ap-field"><span>Treatment schedule</span><select id="n_sched"></select></label>
+      <label class="ap-field"><span>Fumigator in charge</span><select id="n_tech"></select></label>
+      <label class="ap-field"><span>Supervising officer</span><select id="n_off"></select></label>
+      <label class="ap-field"><span>Planned start</span><input id="n_start" type="datetime-local"></label>
+      <label class="ap-field"><span>Enclosure</span><select id="n_enc"><option value="container">Un-sheeted container(s)</option><option value="container_stack">Stack of containers under sheet</option><option value="sheeted">Sheeted enclosure</option><option value="chamber">Fumigation chamber</option><option value="other">Other</option></select></label>
+      <label class="ap-field"><span>Temperature</span><select id="n_fum"><option value="ambient">Ambient</option><option value="controlled">Controlled</option></select></label>
+      <button class="ap-btn" id="n_go">Create record</button>
+    </div></div>
   <p id="msg" class="ap-muted noprint"></p>
   <div id="doc" class="rof" hidden></div>
 </div>
@@ -56,6 +73,7 @@ if (!ApAccess::can($uid, 'admin.pages') && !ApAccess::can($uid, 'treatment.recor
       '<tr>' + lbl('Job identification number', v(B.job_no)) + lbl('Description of consignment', '<textarea id="f_consignment_description" rows="2"' + (dis ? ' disabled' : '') + '>' + v(B.description) + '</textarea>') + '</tr>' +
       '<tr>' + lbl('Street address', inp('f_loc_street', B.street)) + lbl('Target of fumigation', tg('commodity', 'Commodity') + tg('container', 'Container') + tg('packaging', 'Packaging') + tg('other', 'Other') + inp('f_target_other', B.target_other)) + '</tr>' +
       '<tr>' + lbl('Suburb / town / city', inp('f_loc_suburb', B.suburb)) + lbl('Country / postcode', inp('f_loc_country', B.country) + inp('f_loc_postcode', B.postcode)) + '</tr>' +
+      '<tr>' + lbl('Port of loading', inp('f_port_of_loading', B.port_of_loading)) + '<td></td></tr>' +
       '<tr><td colspan="2"><span class="lbl">Consignment identification / container numbers</span>' + B.containers.map(function (c) { return v(c.container_no) + (c.seal_no ? ' (seal ' + v(c.seal_no) + ')' : ''); }).join(', ') + '</td></tr></table>';
     var enc = Object.keys({sheeted: 1, chamber: 1, container: 1, container_stack: 1, other: 1}).map(function (k) { var t = {sheeted: 'Sheeted enclosure', chamber: 'Fumigation chamber', container: 'Un-sheeted container(s)', container_stack: 'Stack of containers under sheet', other: 'Other'}[k]; return (C.enclosure_type === k ? '<strong>' + t + '</strong>' : t); }).join(' / ');
     h += '<table><tr><th class="sec" colspan="4">Section C: Fumigation details</th></tr>' +
@@ -94,14 +112,18 @@ if (!ApAccess::can($uid, 'admin.pages') && !ApAccess::can($uid, 'treatment.recor
       (E.signatures.length ? '' : '<tr><td colspan="3" class="ap-muted">Not signed yet. Signing is in the Treatment Workspace.</td></tr>') +
       '<tr><td>Fumigation result</td><td colspan="2">' + E.results.map(function (r) { return v(r.container_no) + ': ' + (r.result ? v(r.result) : 'pending'); }).join('; ') + '</td></tr>' +
       '<tr><td>Government officer if supervised</td><td colspan="2">' + v(E.officer.full_name || '') + (E.officer.designation ? ', ' + v(E.officer.designation) : '') + '</td></tr></table>';
-    h += '<p class="noprint"><button class="ap-btn" onclick="window.print()">Print</button></p>';
+    var nextStep = {planned: 'Do the pre-treatment check.', prechecked: 'Apply the gas and record the dose.', dosed: 'Take the start-point readings.', exposure: 'Take exposure readings, then top-up if needed and start ventilation.', ventilating: 'Record the TLV readings, then close the treatment.', closed: 'Sign the record and issue certificates.'}[d.status] || '';
+    h += '<p class="noprint">Status: <strong>' + esc(d.status) + '</strong>' + (nextStep && !dis ? '. Next: ' + esc(nextStep) : '') + '</p>';
+    h += '<p class="noprint">' + (dis ? '' : '<button class="ap-btn" id="goWork">Record dosing, readings, top-up and TLV</button> ') + '<button class="ap-btn" onclick="window.print()">Print</button> <button class="ap-btn" id="backList">All records</button></p>';
     $('doc').innerHTML = h; $('doc').hidden = false; $('pick').hidden = true;
+    var gw = $('goWork'); if (gw) { gw.onclick = function () { window.AP_NEXT = tid; NuApp.loadModule('allpest_work'); }; }
+    var bl = $('backList'); if (bl) { bl.onclick = function () { NuApp.loadModule('allpest_rof'); }; }
     var sd = $('saveDet'); if (sd) { sd.onclick = saveDetails; }
     var at = $('addTemp'); if (at) { at.onclick = addTemp; }
   }
   function radio(n) { var el = document.querySelector('input[name="' + n + '"]:checked'); return el ? el.value : ''; }
   function saveDetails() {
-    var f = {consignment_description: $('f_consignment_description').value, loc_street: $('f_loc_street').value, loc_suburb: $('f_loc_suburb').value, loc_country: $('f_loc_country').value, loc_postcode: $('f_loc_postcode').value,
+    var f = {consignment_description: $('f_consignment_description').value, loc_street: $('f_loc_street').value, loc_suburb: $('f_loc_suburb').value, loc_country: $('f_loc_country').value, loc_postcode: $('f_loc_postcode').value, port_of_loading: $('f_port_of_loading').value,
       target_other: $('f_target_other').value, enclosure_other: $('f_enclosure_other').value, remedial_action: $('f_remedial_action').value, suitable: radio('f_suitable'), heaters_used: radio('f_heaters_used'),
       min_enclosure_temp_c: $('f_min_enclosure_temp_c').value, target_of_fumigation: Array.prototype.map.call(document.querySelectorAll('.tg:checked'), function (c) { return c.value; })};
     ['probe_location', 'load_factor_max', 'load_factor_est', 'retention_pct', 'ct_product'].forEach(function (k) { var el = $('f_' + k); if (el) { f[k] = el.value; } });
@@ -112,6 +134,23 @@ if (!ApAccess::can($uid, 'admin.pages') && !ApAccess::can($uid, 'treatment.recor
     var at = $('t_at').value; if (!at) { say('Enter the date and time of the reading.', true); return; }
     post({action: 'temps', treatment_id: tid, values: JSON.stringify(vals), at: new Date(at).toISOString(), initials: $('t_ini').value}).then(function () { say('Row added.'); load(tid); }).catch(function (e) { say(e.message, true); });
   }
+  var opts = null;
+  function fillSel(id, rows, label, filter) { $(id).innerHTML = rows.filter(filter || function () { return true; }).map(function (r) { return '<option value="' + esc(r.id) + '">' + esc(r[label]) + '</option>'; }).join(''); }
+  function fillSched() { fillSel('n_sched', opts.schedules, 'name', function (s) { return s.treatment_type === $('n_type').value; }); }
+  fetch(API + '?options=1', {credentials: 'same-origin'}).then(function (r) { return r.ok ? r.json() : null; }).then(function (o) {
+    if (!o) { return; }
+    opts = o; $('newcard').hidden = false;
+    fillSel('n_tech', o.technicians, 'full_name'); fillSel('n_off', o.officers, 'full_name'); fillSched(); $('n_type').onchange = fillSched;
+    var miss = []; if (!o.technicians.length) { miss.push('a technician'); } if (!o.officers.length) { miss.push('an officer'); } if (!o.schedules.length) { miss.push('a treatment schedule'); }
+    if (miss.length) { $('needs').textContent = 'Before you can start a record, add ' + miss.join(', ') + ' from the All Pest menu (Technicians, Officers, Schedules).'; $('newform').hidden = true; }
+    $('n_go').onclick = function () {
+      post({action: 'create', customer_name: $('n_name').value, customer_email: $('n_email').value, customer_address: $('n_addr').value, site_address: $('n_site').value, containers: $('n_cont').value,
+        rof_type: $('n_type').value, schedule_id: $('n_sched').value, technician_id: $('n_tech').value, officer_id: $('n_off').value, enclosure_type: $('n_enc').value, fumigation_type: $('n_fum').value,
+        scheduled_start: $('n_start').value ? new Date($('n_start').value).toISOString() : ''}).then(function (j) { say('Created ' + j.reference + '.'); $('newcard').hidden = true; load(j.treatment_id); }).catch(function (e) { say(e.message, true); });
+    };
+  }).catch(function () {});
+  var pre = window.AP_ROF_NEXT || null; window.AP_ROF_NEXT = null;
+  if (pre) { load(pre); }
   fetch(TAPI + '?mine=1', {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (rows) {
     $('mine').innerHTML = rows.length ? rows.map(function (t) { return '<p><a href="#" data-id="' + esc(t.id) + '"><strong>' + esc(t.reference) + '</strong></a> ' + esc(t.customer_name) + ' &middot; ' + esc(t.rof_type) + ' &middot; ' + esc(t.status) + '</p>'; }).join('') : '<p class="ap-muted">No treatments yet.</p>';
     $('mine').onclick = function (ev) { var a = ev.target.closest('a[data-id]'); if (a) { ev.preventDefault(); load(a.dataset.id); } };

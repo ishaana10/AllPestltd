@@ -25,7 +25,7 @@ $sets = ['compress.js', 'queue.js', 'signpad.js', 'signing.js', 'rof.js'];
   <h1>Treatment workspace</h1>
   <div id="pick" class="ap-card" hidden><h2>Choose a treatment</h2><div id="mine"></div></div>
   <div id="rof" hidden>
-    <p><a href="#" id="backToList">&larr; All treatments</a></p>
+    <p><a href="#" id="backToList">&larr; All treatments</a> &middot; <a href="#" id="viewRecord">View the record of fumigation</a></p>
     <div class="ap-card"><div id="head"></div><p id="queue" class="ap-muted"></p><div id="locked" class="ap-alert" hidden></div></div>
     <div class="ap-card" id="s_pre" hidden><h2>1. Pre-treatment check</h2><div id="pre"></div></div>
     <div class="ap-card" id="s_dose" hidden><h2>2. Apply the gas</h2><div id="dose"></div></div>
@@ -60,7 +60,9 @@ $sets = ['compress.js', 'queue.js', 'signpad.js', 'signing.js', 'rof.js'];
 (function () {
   window.AP_API = 'api/allpest/';
   window.AP_PARAMS = window.AP_NEXT ? { id: window.AP_NEXT } : {};
+  var openId = window.AP_NEXT || null;
   window.AP_NEXT = null;
+  document.getElementById('viewRecord').addEventListener('click', function (e) { e.preventDefault(); if (openId) { window.AP_ROF_NEXT = openId; } NuApp.loadModule('allpest_rof'); });
   var files = <?php echo json_encode(array_merge(['ui.js'], $sets)); ?>, i = 0;
   document.getElementById('backToList').addEventListener('click', function (e) { e.preventDefault(); ApUi.open(null); });
   (function next() {

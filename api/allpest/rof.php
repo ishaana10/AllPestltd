@@ -12,10 +12,38 @@ ApDb::set($db);
 $uid = (string)($_SESSION['nu_user_id'] ?? '');
 
 try {
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['options'])) {
+        ApAccess::guard('admin.requests');
+        echo json_encode([
+            'schedules' => $db->fetchAll('SELECT id, name, treatment_type FROM ap_schedules WHERE active = 1 ORDER BY name'),
+            'technicians' => $db->fetchAll("SELECT id, full_name FROM ap_technicians WHERE status = 'active' ORDER BY full_name"),
+            'officers' => $db->fetchAll("SELECT id, full_name FROM ap_officers WHERE status = 'active' ORDER BY full_name"),
+        ]);
+        exit;
+    }
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $id = (string)($_GET['id'] ?? '');
         ApAccess::guard('treatment.view', $id);
         echo json_encode(ApRof::document($id));
+        exit;
+    }
+    if ((string)($_POST['action'] ?? '') === 'create') {
+        // Staff start a record directly: a confirmed request with its containers and a planned treatment.
+        ApAccess::guard('admin.requests');
+        $containers = array_values(array_filter(array_map('trim', preg_split('/[\r\n,;]+/', (string)($_POST['containers'] ?? '')))));
+        if (!$containers) { throw new InvalidArgumentException('Enter at least one container number.'); }
+        $email = trim((string)($_POST['customer_email'] ?? ''));
+        if ($email === '') { ApRequests::setMailer(function (): void {}); }   // no address to write to: skip the acknowledgement mail
+        try {
+        $req = ApRequests::submitPublic(['customer_name' => (string)($_POST['customer_name'] ?? ''), 'customer_email' => $email !== '' ? $email : 'none@invalid.example', 'customer_address' => (string)($_POST['customer_address'] ?? ''),
+            'site_address' => (string)($_POST['site_address'] ?? ''), 'client_token' => bin2hex(random_bytes(16)), 'consignments' => array_map(fn ($c) => ['container_no' => $c], $containers)], [], 'staff:' . substr($uid, 0, 30));
+        } finally { if ($email === '') { ApRequests::setMailer(null); } }
+        ApRequests::confirm($req['request_id'], [], $uid);
+        $ids = array_column($db->fetchAll('SELECT id FROM ap_consignments WHERE request_id = ?', [$req['request_id']]), 'id');
+        try { $start = (new DateTimeImmutable((string)($_POST['scheduled_start'] ?? '')))->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s'); } catch (Throwable $e) { throw new InvalidArgumentException('Enter the planned start date and time.'); }
+        $tid = ApRequests::createTreatment($req['request_id'], $ids, ['scheduled_start' => $start, 'technician_id' => (string)($_POST['technician_id'] ?? ''), 'officer_id' => (string)($_POST['officer_id'] ?? ''),
+            'schedule_id' => (string)($_POST['schedule_id'] ?? ''), 'rof_type' => (string)($_POST['rof_type'] ?? 'general'), 'enclosure_type' => (string)($_POST['enclosure_type'] ?? ''), 'fumigation_type' => (string)($_POST['fumigation_type'] ?? 'ambient')]);
+        echo json_encode(['treatment_id' => $tid, 'reference' => $req['reference']]);
         exit;
     }
     $tid = (string)($_POST['treatment_id'] ?? '');
@@ -35,6 +63,6 @@ try {
     }
 } catch (ApLockedException $e) {
     http_response_code(423); echo json_encode(['error' => $e->getMessage()]);
-} catch (InvalidArgumentException | ApTreatmentError $e) {
+} catch (InvalidArgumentException | ApTreatmentError | ApRequestStateError | ApIntakeRejected $e) {
     http_response_code(422); echo json_encode(['error' => $e->getMessage()]);
 }

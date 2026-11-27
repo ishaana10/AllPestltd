@@ -13,7 +13,7 @@ ApDb::set($db);
 ApAccess::guard('admin.settings');
 
 const AP_SETTING_KEYS = ['company_name', 'company_address', 'treatment_provider_id', 'staff_email', 'invoice.mode', 'erpx.base_url', 'erpx.api_key', 'erpx.product.general', 'erpx.product.perishable',
-    'erpx.tax_rate', 'certificate_admin_verify', 'certificate_target', 'stock.low_threshold_g'];
+    'erpx.tax_rate', 'certificate_admin_verify', 'certificate_target', 'certificate_additional_declarations', 'stock.low_threshold_g'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $out = [];
