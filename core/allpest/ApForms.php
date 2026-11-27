@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/ApSettings.php';
+require_once __DIR__ . '/ApDashboard.php';
 
 /**
  * Provisions the All Pest screens as ordinary StudioX forms (nu_forms) and sidebar entries (nu_menus), so they are built, edited,
@@ -168,13 +169,14 @@ final class ApForms
             $created[] = $code;
         }
         self::provisionMenu($db, $projectId);
+        ApDashboard::provision($db, $projectId);
         return $created;
     }
 
     /** Sidebar entries that open a studio module rather than a form: target => [label, order, roles]. */
     public static function moduleEntries(): array
     {
-        return ['allpest_work' => ['Treatment Workspace', 5, self::FIELD], 'allpest_rof' => ['Record of Fumigation', 4, self::FIELD], 'allpest_board' => ['Request Board', 6, self::ADMIN], 'allpest_stock' => ['Stock', 7, self::ADMIN], 'allpest_invoices' => ['Invoices', 8, self::ADMIN], 'allpest_dashboard' => ['Dashboard and Reports', 3, self::ADMIN], 'allpest_settings' => ['Settings', 90, self::ADMIN]];
+        return ['allpest_work' => ['Treatment Workspace', 5, self::FIELD], 'allpest_rof' => ['Record of Fumigation', 4, self::FIELD], 'allpest_board' => ['Request Board', 6, self::ADMIN], 'allpest_stock' => ['Stock', 7, self::ADMIN], 'allpest_invoices' => ['Invoices', 8, self::ADMIN], 'dashboard' => ['Dashboard', 3, self::ADMIN], 'reports' => ['Reports', 9, self::ADMIN], 'allpest_settings' => ['Settings', 90, self::ADMIN]];
     }
 
     /** PHP run when the staff request form is opened: bring in the containers of any new public requests first. */
@@ -225,8 +227,10 @@ final class ApForms
                 'menu_role_access' => json_encode(explode(',', $d['roles'])), 'menu_active' => 1, 'menu_icon' => 'form', 'menu_open_mode' => 'inline|browse', 'menu_browse_mode' => 'inline',
                 'menu_preview_mode' => 'inline', 'menu_default_view' => 'browse', 'project_id' => $projectId]);
         }
+        // The first dashboard was a hard-coded module; it is now studio widgets and Reports, so drop its old menu entry.
+        $db->query("DELETE FROM nu_menus WHERE menu_target = 'allpest_dashboard' AND project_id = ?", [$projectId]);
         foreach (self::moduleEntries() as $target => [$label, $order, $roles]) {
-            if ($db->fetchOne('SELECT menu_id FROM nu_menus WHERE menu_target = ? AND project_id = ?', [$target, $projectId])) { continue; }
+            if ($db->fetchOne('SELECT menu_id FROM nu_menus WHERE menu_target = ? AND project_id = ? AND menu_parent_id = ?', [$target, $projectId, $groupId])) { continue; }
             $db->insert('nu_menus', ['menu_label' => $label, 'menu_type' => 'module', 'menu_target' => $target, 'menu_parent_id' => $groupId, 'menu_order' => $order, 'menu_roles' => $roles,
                 'menu_role_access' => json_encode(explode(',', $roles)), 'menu_active' => 1, 'menu_icon' => 'clipboard', 'menu_open_mode' => 'inline|browse', 'menu_browse_mode' => 'inline',
                 'menu_preview_mode' => 'inline', 'menu_default_view' => 'browse', 'project_id' => $projectId]);

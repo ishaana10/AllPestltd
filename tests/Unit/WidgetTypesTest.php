@@ -10,7 +10,7 @@ use NuWidgetRegistry;
 class WidgetTypesTest extends TestCase {
     private const EXPECTED_TYPES = [
         'stat', 'metric_trend', 'sparkline', 'chart_bar', 'chart_line', 'chart_area', 'chart_pie', 'chart_doughnut',
-        'chart_radar', 'table', 'list', 'quick_actions', 'activity', 'progress', 'gauge', 'iframe', 'custom', 'announcement',
+        'chart_radar', 'chart_stacked', 'table', 'list', 'quick_actions', 'activity', 'progress', 'gauge', 'iframe', 'custom', 'announcement',
     ];
     private const MULTI_SQL = "SELECT 'a' AS label, 120 AS value, 100 AS prev_value, 3 AS done, 4 AS total, 'now' AS time, 'ann' AS user, 'did it' AS text";
 

@@ -76,14 +76,26 @@
         x: { grid: { display: false }, ticks: { color: muted } },
         y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,.2)' }, ticks: { color: muted, precision: 0 } }
       };
+      var datasets = [ds];
+      if (cfg.series) {   // multi-series (stacked) charts: one dataset per SQL column
+        var SERIES_COLORS = { pass: '#16a34a', fail: '#dc2626' };
+        datasets = cfg.series.map(function (S, i) {
+          var c = SERIES_COLORS[String(S.name).toLowerCase()] || PALETTE[i % PALETTE.length];
+          return { label: S.name, data: S.values, backgroundColor: c, borderColor: c, borderWidth: 0, borderRadius: 0 };
+        });
+        scales = {
+          x: { stacked: !!cfg.stacked, grid: { display: false }, ticks: { color: muted } },
+          y: { stacked: !!cfg.stacked, beginAtZero: true, grid: { color: 'rgba(148,163,184,.2)' }, ticks: { color: muted, precision: 0 } }
+        };
+      }
       var chart = new Chart(canvas, {
         type: type,
-        data: { labels: cfg.labels, datasets: [ds] },
+        data: { labels: cfg.labels, datasets: datasets },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           animation: reducedMotion() ? false : { duration: 500 },
-          plugins: { legend: { display: round, position: 'bottom', labels: { color: muted, boxWidth: 10 } }, tooltip: { enabled: !compact } },
+          plugins: { legend: { display: round || !!cfg.series, position: 'bottom', labels: { color: muted, boxWidth: 10 } }, tooltip: { enabled: !compact } },
           scales: scales
         }
       });

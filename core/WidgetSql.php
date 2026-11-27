@@ -15,6 +15,12 @@ class NuWidgetSql {
             '{{today}}'      => date('Y-m-d'),
             '{{this_month}}' => date('Y-m-01'),
             '{{this_year}}'  => date('Y-01-01'),
+            // Relative dates for rolling windows, e.g. WHERE closed_at >= '{{days_ago_90}}'
+            '{{days_ago_7}}'    => date('Y-m-d', strtotime('-7 days')),
+            '{{days_ago_30}}'   => date('Y-m-d', strtotime('-30 days')),
+            '{{days_ago_90}}'   => date('Y-m-d', strtotime('-90 days')),
+            '{{days_ago_365}}'  => date('Y-m-d', strtotime('-365 days')),
+            '{{days_ahead_30}}' => date('Y-m-d', strtotime('+30 days')),
         ]);
     }
 
