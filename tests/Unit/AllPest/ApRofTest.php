@@ -193,4 +193,11 @@ final class ApRofTest extends TestCase
         $this->assertSame($ref . '-1', $d['B']['job_no']);
         $this->assertSame($ref, $d['B']['order_no']);
     }
+
+    public function testOpenRecordHidesTheNewRecordFormAndOffersWayBack(): void
+    {
+        $ui = (string)file_get_contents(dirname(__DIR__, 3) . '/modules/allpest_rof/allpest_rof.php');
+        $this->assertStringContainsString("\$('newcard').hidden = true; \$('bar').hidden = false;", $ui);
+        $this->assertStringContainsString('b_back', $ui);
+    }
 }
