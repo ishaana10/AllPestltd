@@ -53,13 +53,13 @@ final class ApSchema
                 . 'fumigation_type VARCHAR(20) NOT NULL DEFAULT \'ambient\', enclosure_type VARCHAR(30) NULL, height_m DECIMAL(8,3) NULL, depth_m DECIMAL(8,3) NULL, length_m DECIMAL(8,3) NULL, '
                 . 'volume_m3 DECIMAL(10,3) NULL, mb_fraction DECIMAL(4,3) NOT NULL DEFAULT 1, dose_rate_used DECIMAL(10,2) NULL, dose_g DECIMAL(12,2) NULL, applied_g DECIMAL(12,2) NULL, '
                 . 'lot_id CHAR(36) NULL, equipment_ids TEXT NULL, forecast_min_c DECIMAL(5,1) NULL, forecast_source TEXT NULL, forecast_retrieved_at DATETIME NULL, forecast_json TEXT NULL, '
-                . 'injected_at DATETIME NULL, start_point_at DATETIME NULL, ventilation_at DATETIME NULL, result VARCHAR(10) NULL, version INTEGER NOT NULL DEFAULT 1, locked_at DATETIME NULL, '
+                . 'injected_at DATETIME NULL, start_point_at DATETIME NULL, ventilation_at DATETIME NULL, whole_gram TINYINT NOT NULL DEFAULT 0, increment_g DECIMAL(10,2) NULL, topup_at DATETIME NULL, topup_g DECIMAL(12,2) NULL, topup_extension_h DECIMAL(6,2) NULL, result VARCHAR(10) NULL, version INTEGER NOT NULL DEFAULT 1, locked_at DATETIME NULL, '
                 . 'closed_at DATETIME NULL, admin_verified_by VARCHAR(64) NULL, admin_verified_at DATETIME NULL, ' . $created . ', ' . $updated, ['request_id', 'technician_id']],
-            'treatment_containers' => [$id . ', treatment_id CHAR(36) NOT NULL, consignment_id CHAR(36) NOT NULL UNIQUE, result VARCHAR(10) NULL, tlv_ppm DECIMAL(8,2) NULL, tlv_at DATETIME NULL', ['treatment_id']],
+            'treatment_containers' => [$id . ', treatment_id CHAR(36) NOT NULL, consignment_id CHAR(36) NOT NULL UNIQUE, result VARCHAR(10) NULL, core_temp_c DECIMAL(5,1) NULL, tlv_ppm DECIMAL(8,2) NULL, tlv_at DATETIME NULL', ['treatment_id']],
             'treatment_versions' => [$id . ', treatment_id CHAR(36) NOT NULL, version INTEGER NOT NULL, snapshot TEXT NOT NULL, reason TEXT NULL, user_id VARCHAR(64) NULL, ' . $created
                 . ', UNIQUE (treatment_id, version)', []],
             'reading_sets' => [$id . ', treatment_id CHAR(36) NOT NULL, client_uuid CHAR(36) NOT NULL UNIQUE, stage VARCHAR(30) NOT NULL, taken_at DATETIME NOT NULL, initials VARCHAR(10) NOT NULL, '
-                . 'standard DECIMAL(10,2) NULL, equilibrium_pct DECIMAL(7,3) NULL, version INTEGER NOT NULL DEFAULT 1, created_by VARCHAR(64) NULL, ' . $created, ['treatment_id']],
+                . 'standard DECIMAL(10,2) NULL, equilibrium_pct DECIMAL(7,3) NULL, result_json TEXT NULL, version INTEGER NOT NULL DEFAULT 1, created_by VARCHAR(64) NULL, ' . $created, ['treatment_id']],
             'reading_set_files' => [$id . ', reading_set_id CHAR(36) NOT NULL, file_id CHAR(36) NOT NULL', ['reading_set_id']],
             'readings' => [$id . ', reading_set_id CHAR(36) NOT NULL, container_id CHAR(36) NOT NULL, location VARCHAR(30) NOT NULL, value DECIMAL(10,2) NOT NULL, meets TINYINT NULL', ['reading_set_id']],
             'signatures' => [$id . ', treatment_id CHAR(36) NOT NULL, role VARCHAR(12) NOT NULL, signer_name VARCHAR(150) NOT NULL, signer_designation VARCHAR(150) NULL, user_id VARCHAR(64) NULL, '
