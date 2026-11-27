@@ -61,6 +61,7 @@ abstract class TestCase
     }
     public function assertArrayHasKey(int|string $k, array $a, string $m = ''): void { if (!array_key_exists($k, $a)) self::fail($m ?: "Failed asserting that array has key $k"); }
     public function assertStringContainsString(string $needle, string $h, string $m = ''): void { if (!str_contains($h, $needle)) self::fail($m ?: "Failed asserting that '$h' contains '$needle'"); }
+    public function assertStringStartsWith(string $prefix, string $h, string $m = ""): void { if (!str_starts_with($h, $prefix)) self::fail($m ?: "Failed asserting that string starts with $prefix"); }
     public function assertStringNotContainsString(string $needle, string $h, string $m = ''): void { if (str_contains($h, $needle)) self::fail($m ?: "Failed asserting that '$h' does not contain '$needle'"); }
     public function assertGreaterThan(float|int $e, float|int $a, string $m = ''): void { if (!($a > $e)) self::fail($m ?: "Failed asserting that $a is greater than $e"); }
     public function assertGreaterThanOrEqual(float|int $e, float|int $a, string $m = ''): void { if (!($a >= $e)) self::fail($m ?: "Failed asserting that $a is >= $e"); }
