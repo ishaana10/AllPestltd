@@ -1,10 +1,12 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/ApSettings.php';
+
 /**
  * Provisions the All Pest screens as ordinary StudioX forms (nu_forms) and sidebar entries (nu_menus), so they are built, edited,
- * permissioned and audited by the studio itself. Idempotent: existing forms are never overwritten (so edits made in the Forms builder
- * survive), only missing ones are created. Forms over tables whose rules live in the All Pest engine (treatments, certificates,
+ * permissioned and audited by the studio itself. Idempotent: missing forms are created, and a form still carrying the layout this app last wrote is
+ * refreshed; one edited in the Forms builder is left alone. Forms over tables whose rules live in the All Pest engine (treatments, certificates,
  * invoices, stock movements) are read-only: changes to them go through the engine so the checks and the audit trail stay intact.
  */
 final class ApForms
@@ -46,7 +48,7 @@ final class ApForms
                     self::row(self::t('customer_phone', 'Phone'), self::t('customer_tin', 'TIN')),
                     self::row(self::area('customer_address', 'Customer address')),
                     self::row(self::area('site_address', 'Site address (where the treatment is done)')),
-                    self::row(self::dt('requested_date', 'Requested date', 'date'), self::sel('status', 'Status', ['new' => 'New', 'confirmed' => 'Confirmed', 'scheduled' => 'Scheduled', 'in_progress' => 'In progress', 'completed' => 'Completed', 'cancelled' => 'Cancelled'], 6, ['default_value' => 'new'])),
+                    self::row(self::dt('requested_date', 'Requested date', 'date'), self::ro(self::sel('status', 'Status (changed from the Request Board)', ['new' => 'New', 'confirmed' => 'Confirmed', 'scheduled' => 'Scheduled', 'in_progress' => 'In progress', 'completed' => 'Completed', 'cancelled' => 'Cancelled'], 6, ['default_value' => 'new']))),
                     self::row(['name' => 'reference', 'label' => 'Reference', 'type' => 'autonumber', 'col' => 6, 'sequence_code' => 'ap_staff_request_ref', 'prefix_pattern' => 'AP-S-', 'suffix_pattern' => '', 'padding_length' => 5], self::t('job_type', 'Job type', 6, ['default_value' => 'fumigation', 'readonly' => true])),
                     self::row(self::area('notes', 'Notes')),
                     self::row(self::area('container_list', 'Containers as submitted on the public form (imported into the grid below once)', 12, ['readonly' => true])),
@@ -136,12 +138,28 @@ final class ApForms
         ];
     }
 
-    /** Create any missing All Pest forms and menu entries. @return string[] the form codes created this run */
+    /**
+     * Create any missing All Pest forms and menu entries; bring forms the builder has not touched up to the current layout.
+     * A form whose layout still matches the one this app last wrote (kept as a hash in the settings) is refreshed; one that was
+     * edited in the builder is left alone. @return string[] the form codes created this run
+     */
     public static function provision(object $db, int $projectId = 1, ?int $userId = null): array
     {
         $created = [];
         foreach (self::definitions() as $code => $d) {
-            if ($db->fetchOne('SELECT form_id FROM nu_forms WHERE form_code = ? AND project_id = ?', [$code, $projectId])) { continue; }
+            $have = $db->fetchOne('SELECT form_id, form_layout, browse_layout FROM nu_forms WHERE form_code = ? AND project_id = ?', [$code, $projectId]);
+            if ($have) {
+                $new = json_encode($d['layout']) . '|' . json_encode($d['browse']);
+                $key = 'forms.layout_hash.' . $code;
+                $stored = (string)ApSettings::get($key, '');
+                $now = md5((string)$have['form_layout'] . '|' . (string)$have['browse_layout']);
+                if (($stored === '' || $stored === $now) && $now !== md5($new)) {
+                    $db->update('nu_forms', ['form_layout' => json_encode($d['layout']), 'browse_layout' => json_encode($d['browse'])], 'form_id = ?', [$have['form_id']]);
+                }
+                if ($stored === $now || $stored === '' || $now === md5($new)) { ApSettings::set($key, md5($new)); }
+                continue;
+            }
+            ApSettings::set('forms.layout_hash.' . $code, md5(json_encode($d['layout']) . '|' . json_encode($d['browse'])));
             $db->insert('nu_forms', [
                 'project_id' => $projectId, 'form_code' => $code, 'form_type' => in_array($d['type'] ?? 'main', ['subform'], true) ? 'subform' : 'main', 'form_name' => $d['name'], 'form_table' => $d['table'], 'form_description' => $d['description'],
                 'form_layout' => json_encode($d['layout']), 'browse_layout' => json_encode($d['browse']), 'form_active' => 1, 'form_pk_type' => 'uuid', 'form_table_mode' => 'existing',

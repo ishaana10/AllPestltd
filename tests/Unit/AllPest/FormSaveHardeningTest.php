@@ -21,4 +21,11 @@ final class FormSaveHardeningTest extends TestCase
         $this->assertTrue(strpos($s, 'function nu_get_column_meta') !== false);
         $this->assertTrue(strpos($s, "\$val === ''") !== false);
     }
+
+    public function testRequestCodeLoadsItsOwnAuditClass(): void
+    {
+        // Each API script loads only the classes it names: ApRequests must pull in ApAudit itself, or confirm/schedule die after the update.
+        $code = "require " . var_export(dirname(__DIR__, 3) . '/core/allpest/ApRequests.php', true) . "; echo class_exists('ApAudit') ? 'yes' : 'no';";
+        $this->assertSame('yes', trim((string)shell_exec(escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg($code) . ' 2>&1')));
+    }
 }

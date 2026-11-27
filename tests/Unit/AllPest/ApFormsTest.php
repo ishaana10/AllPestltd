@@ -4,7 +4,7 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/support/ApTestDb.php';
-foreach (['ApId', 'ApSchema', 'ApDb', 'ApForms'] as $c) { require_once dirname(__DIR__, 3) . "/core/allpest/$c.php"; }
+foreach (['ApId', 'ApSchema', 'ApDb', 'ApSettings', 'ApForms'] as $c) { require_once dirname(__DIR__, 3) . "/core/allpest/$c.php"; }
 
 final class ApFormsTest extends TestCase
 {
@@ -62,6 +62,20 @@ final class ApFormsTest extends TestCase
         $this->assertSame('uuid', $f['form_pk_type']);
         $this->assertSame('existing', $f['form_table_mode']);
         $this->assertTrue(is_array(json_decode($f["form_layout"], true)));
+    }
+
+    public function testProvisionRefreshesUntouchedFormsButNotOnesEditedInTheBuilder(): void
+    {
+        ApForms::provision($this->db, 1);
+        // an older release's layout, never edited: brought up to date
+        $this->db->exec("UPDATE nu_forms SET form_layout = '[]' WHERE form_code = 'ap_equipment'");
+        ApSettings::set('forms.layout_hash.ap_equipment', md5("[]|" . $this->db->fetchOne("SELECT browse_layout b FROM nu_forms WHERE form_code = 'ap_equipment'")['b']));
+        ApForms::provision($this->db, 1);
+        $this->assertNotSame('[]', $this->db->fetchOne("SELECT form_layout l FROM nu_forms WHERE form_code = 'ap_equipment'")['l']);
+        // edited in the builder after we wrote it: left alone
+        $this->db->exec("UPDATE nu_forms SET form_layout = '[\"mine\"]' WHERE form_code = 'ap_equipment'");
+        ApForms::provision($this->db, 1);
+        $this->assertSame('["mine"]', $this->db->fetchOne("SELECT form_layout l FROM nu_forms WHERE form_code = 'ap_equipment'")['l']);
     }
 
     public function testEngineOwnedFormsAreReadOnlyAndCannotBeDeleted(): void

@@ -6,6 +6,7 @@ require_once __DIR__ . '/ApDb.php';
 require_once __DIR__ . '/ApSettings.php';
 require_once __DIR__ . '/ApUploads.php';
 require_once __DIR__ . '/ApTechnicians.php';
+require_once __DIR__ . '/ApAudit.php';
 
 class ApIntakeRejected extends RuntimeException
 {

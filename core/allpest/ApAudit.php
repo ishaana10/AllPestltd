@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+if (!class_exists('NuAudit') && is_file(dirname(__DIR__) . '/Audit.php')) { require_once dirname(__DIR__) . '/Audit.php'; }
+
 /** All Pest audit events, written to the StudioX hash-chained audit log (NuAudit) with the treatment id, user and device. */
 final class ApAudit
 {
