@@ -12,7 +12,8 @@ window.ApSigning = (function () {
       U.get('certificates.php', { treatment_id: id }).then(function (r) {
         U.table($('certs'), r, [{ label: 'Container', key: 'container_no' }, { label: 'Result', render: function (x) { return '<span class="ap-badge ' + U.esc(x.result) + '">' + U.esc(x.result || '-') + '</span>'; } },
           { label: 'Certificate', render: function (x) { return U.esc(x.number || '-'); } }, { label: 'Emailed', render: function (x) { return x.emailed_at ? U.fiji(x.emailed_at) : (x.email_pending ? 'pending' : ''); } },
-          { label: 'Release', render: function (x) { return U.esc(typeof x.release === 'object' ? JSON.stringify(x.release) : x.release); } }]);
+          { label: 'Release', render: function (x) { var r = x.release; if (r && typeof r === 'object') { return r.ok ? 'Ready' : 'Waiting for: ' + U.esc((r.missing || []).join(', ').replace(/_/g, ' ')); } return U.esc(r); } },
+          { label: 'PDF', render: function (x) { return x.number ? '<a href="' + (window.AP_API || '../../api/allpest/') + 'certificates.php?pdf=1&container_id=' + encodeURIComponent(x.id) + '" target="_blank" rel="noopener">View</a>' : ''; } }]);
       }, U.fail);
     } else { $('certs').innerHTML = '<p class="ap-muted">Certificates are issued by the office once both signatures are in.</p>'; }
   }

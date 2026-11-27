@@ -18,8 +18,9 @@ if ($userId === '' || $userId === 'guest_tester') { http_response_code(403); ech
 
 $verify = function (string $uid, string $password, ?string $mfa) use ($db, $auth, $userId): bool {
     if ($uid !== $userId) { return false; }
-    $u = $db->fetchOne('SELECT usr_password, usr_2fa_enabled, usr_2fa_secret FROM nu_users WHERE usr_id = :i', [':i' => $uid]);
+    $u = $db->fetchOne('SELECT * FROM nu_users WHERE usr_id = :i', [':i' => $uid]);
     if (!$u || !password_verify($password, (string)$u['usr_password'])) { return false; }
+    // a fresh install has no usr_2fa_enabled column until MFA is first set up, so a missing column means MFA is off
     if (!empty($u['usr_2fa_enabled']) && !empty($u['usr_2fa_secret'])) {
         $secret = (string)$u['usr_2fa_secret'];
         if (class_exists('NuEncryption') && NuEncryption::isEncrypted($secret)) { $secret = NuEncryption::decryptField('nu_users', 'usr_2fa_secret', $secret); }

@@ -203,6 +203,15 @@ final class ApCertificatesTest extends TestCase
         $this->assertSame('2345', $d['equipment'][0]['serial_last4']);
     }
 
+    public function testIssuedDateIsShownAsDayMonthYearWithoutChangingTheStoredData(): void
+    {
+        ApCertificates::issueEligible($this->tid, $this->utc('2026-12-11 13:00:00'));
+        $d = ApCertificates::data($this->tcs[0]);
+        $this->assertTrue((bool)preg_match('/^2026-12-\d\d/', $d['issued_at']), 'stored data stays ISO so old hashes still match');
+        $m = new ReflectionMethod(ApCertificateRenderer::class, 'dmy'); $m->setAccessible(true);
+        $this->assertSame('12/12/2026', $m->invoke(null, '2026-12-12 01:00'));
+    }
+
     public function testCertificateCarriesTheTemplateFields(): void
     {
         $this->db->update('ap_treatments', ['target_of_fumigation' => 'commodity,packaging', 'enclosure_other' => '', 'loc_street' => '1 Wharf Rd', 'loc_suburb' => 'Lautoka', 'loc_country' => 'Fiji', 'loc_postcode' => '0000'], 'id = ?', [$this->tid]);
