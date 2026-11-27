@@ -6,7 +6,7 @@ declare(strict_types=1);
  */
 require_once dirname(__DIR__, 2) . '/core/module_bootstrap.php';
 require_once dirname(__DIR__, 2) . '/core/allpest/ApAccess.php';
-foreach (['ApId', 'ApSchema', 'ApDb', 'ApSettings', 'ApUploads', 'ApRequests', 'ApTreatments', 'ApStock'] as $c) { require_once dirname(__DIR__, 2) . "/core/allpest/$c.php"; }
+foreach (['ApId', 'ApSchema', 'ApDb', 'ApSettings', 'ApUploads', 'ApRequests', 'ApNum', 'ApTreatments', 'ApStock'] as $c) { require_once dirname(__DIR__, 2) . "/core/allpest/$c.php"; }
 
 /** Fetch the forecast on the server (never trusted from the tablet) for the treatment's site and exposure window. */
 function apFetchForecast(object $db, string $tid, DateTimeZone $utc): array
@@ -71,17 +71,17 @@ try {
     switch ((string)($_POST['action'] ?? '')) {
         case 'precheck':
             $in = json_decode((string)($_POST['input'] ?? ''), true);
-            if (is_array($in) && ($in['forecast'] ?? null) === 'auto') {
-                $in['forecast'] = apFetchForecast($db, $tid, $utc);
+            if (is_array($in)) {
+                $in['forecast'] = ($in['forecast'] ?? null) === 'auto' ? apFetchForecast($db, $tid, $utc) : ApTreatments::sanitizeClientForecast($in['forecast'] ?? null);
             }
             echo json_encode(ApTreatments::preCheck($tid, is_array($in) ? $in : [], new DateTimeImmutable('now', $utc)));
             break;
         case 'core_temp':
-            ApTreatments::recordCoreTemp($tid, (string)($_POST['container_id'] ?? ''), (float)($_POST['temp_c'] ?? 0));
+            ApTreatments::recordCoreTemp($tid, (string)($_POST['container_id'] ?? ''), ApNum::strict($_POST['temp_c'] ?? '', 'Core temperature'));
             echo json_encode(['ok' => true]);
             break;
         case 'dose':
-            ApTreatments::recordDosing($tid, $when('injected_at'), (float)($_POST['grams'] ?? 0), (string)($_POST['lot_id'] ?? ''));
+            ApTreatments::recordDosing($tid, $when('injected_at'), ApNum::strict($_POST['grams'] ?? '', 'Grams'), (string)($_POST['lot_id'] ?? ''));
             echo json_encode(['ok' => true]);
             break;
         case 'readings':
@@ -89,7 +89,7 @@ try {
             echo json_encode(ApTreatments::recordReadingSet($tid, (string)($_POST['client_uuid'] ?? ''), (string)($_POST['stage'] ?? ''), $when('at'), is_array($values) ? $values : [], (array)($_POST['file_ids'] ?? []), (string)($_POST['initials'] ?? '')));
             break;
         case 'topup':
-            ApTreatments::recordTopUp($tid, $when('at'), (float)($_POST['grams'] ?? 0), (string)($_POST['lot_id'] ?? ''));
+            ApTreatments::recordTopUp($tid, $when('at'), ApNum::strict($_POST['grams'] ?? '', 'Grams'), (string)($_POST['lot_id'] ?? ''));
             echo json_encode(['ok' => true]);
             break;
         case 'ventilation':
@@ -97,7 +97,7 @@ try {
             echo json_encode(['ok' => true]);
             break;
         case 'tlv':
-            ApTreatments::recordTlv($tid, (string)($_POST['container_id'] ?? ''), (float)($_POST['ppm'] ?? -1), $when('at'));
+            ApTreatments::recordTlv($tid, (string)($_POST['container_id'] ?? ''), ApNum::strict($_POST['ppm'] ?? '', 'TLV ppm'), $when('at'));
             echo json_encode(['ok' => true]);
             break;
         case 'close':

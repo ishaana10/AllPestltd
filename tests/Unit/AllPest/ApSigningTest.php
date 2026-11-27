@@ -269,6 +269,16 @@ final class ApSigningTest extends TestCase
         $this->assertSame(1, (int)$this->db->fetchOne('SELECT version FROM ap_treatments WHERE id = ?', [$this->tid])['version']);
     }
 
+    public function testCorrectionRejectsInvalidValuesAndLeavesTheRecordUntouched(): void
+    {
+        $this->fumigatorSigns();
+        foreach ([['volume_m3' => '-5'], ['dose_rate_used' => '0'], ['scheduled_start' => 'x'], ['equipment_ids' => 'junk'], ['height_m' => 'abc'],
+                  ['mb_fraction' => '1.5'], ['site_lat' => '95'], ['fumigation_type' => 'wild'], ['officer_id' => 'nobody']] as $bad) {
+            try { $this->sign->correct($this->tid, $bad, 'reason', 'user-1'); $this->fail('expected rejection ' . json_encode($bad)); } catch (InvalidArgumentException $e) { $this->assertTrue(true); }
+        }
+        $this->assertSame(1, (int)$this->db->fetchOne('SELECT version FROM ap_treatments WHERE id = ?', [$this->tid])['version']);
+    }
+
     public function testEmptyCorrectionIsRejected(): void
     {
         $this->fumigatorSigns();

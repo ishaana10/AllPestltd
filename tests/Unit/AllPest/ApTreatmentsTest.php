@@ -145,7 +145,13 @@ final class ApTreatmentsTest extends TestCase
 
     public function testStaleForecastIsBlocked(): void
     {
-        $r = $this->precheck(['forecast' => ['manual_min_c' => 25.0, 'source_note' => 'old', 'retrieved_at' => '2026-12-07 08:00:00']]);
+        $r = ApTreatments::preCheck($this->tid, $this->in(), $this->utc('2026-12-07 08:00:00'));   // entered three days before the start
+        $this->assertStringContainsString('forecast', strtolower(implode(' ', $r['blocked'])));
+    }
+
+    public function testTypedForecastTimeIsIgnoredSoFreshnessCannotBeBypassed(): void
+    {
+        $r = ApTreatments::preCheck($this->tid, $this->in(['forecast' => ['manual_min_c' => 25.0, 'source_note' => 'x', 'retrieved_at' => '2026-12-10 05:00:00']]), $this->utc('2026-12-07 08:00:00'));
         $this->assertStringContainsString('forecast', strtolower(implode(' ', $r['blocked'])));
     }
 
@@ -351,6 +357,36 @@ final class ApTreatmentsTest extends TestCase
         $r = $this->set('x28', 'end_exposure', '2026-12-11 10:45:00', $this->all('20', '16', '15'));
         $this->assertFalse($r['equilibriumRequired']);
         $this->assertTrue($r['allMeet']);                    // 28 h standard is 29.15 % of 48 = 13.99
+    }
+
+    public function testEndExposureSetBeforeTheExposureHasRunIsRefused(): void
+    {
+        $this->started();                                    // start point 06:32, exposure 24 h
+        $before = $this->n('ap_reading_sets');
+        try { $this->set('early', 'end_exposure', '2026-12-10 07:00:00', $this->all('40', '40', '40')); $this->fail('end set 0.5 h in must be refused'); }
+        catch (InvalidArgumentException $e) { $this->assertTrue(true); }
+        $this->assertSame($before, $this->n('ap_reading_sets'));
+    }
+
+    public function testClosedPassNeedsAnEndSetTakenAfterTheFullExposure(): void
+    {
+        $this->started();
+        $this->set('x24', 'end_exposure', '2026-12-11 06:32:00', $this->all('13', '12', '12.5'));
+        ApTreatments::recordTopUp($this->tid, $this->utc('2026-12-11 06:45:00'), 570.0, $this->lot);   // exposure now ends 10:32
+        ApTreatments::recordVentilation($this->tid, $this->utc('2026-12-11 11:00:00'));
+        foreach ($this->tcs as $id) { ApTreatments::recordTlv($this->tid, $id, 1.0, $this->utc('2026-12-11 12:00:00')); }
+        try { ApTreatments::close($this->tid); $this->fail('the 24 h set predates the extension: close must demand a post-extension set'); }
+        catch (ApTreatmentError $e) { $this->assertTrue(true); }
+    }
+
+    public function testPostExtensionSetIsJudgedAgainstTheOriginalEndStandard(): void
+    {
+        $this->started();
+        $this->set('x24', 'end_exposure', '2026-12-11 06:32:00', $this->all('13', '12', '12.5'));
+        ApTreatments::recordTopUp($this->tid, $this->utc('2026-12-11 06:45:00'), 570.0, $this->lot);
+        $r = $this->set('x28', 'end_exposure', '2026-12-11 10:32:00', $this->all('14.2', '14.2', '14.2'));
+        $this->assertEqualsWithDelta(14.4, $r['standard'], 0.001);
+        $this->assertFalse($r['allMeet']);                   // 14.2 < original 14.4, though it would pass the 28 h standard (13.99)
     }
 
     // ---- ventilation, TLV, close ----------------------------------------------------------------------------------

@@ -220,6 +220,10 @@ final class ApTreatments
             $startPoint = new DateTimeImmutable((string)$t['start_point_at'], $utc);
             if ($at < $startPoint) { throw new InvalidArgumentException('Readings cannot be earlier than the start point.'); }
             $hours = ($at->getTimestamp() - $startPoint->getTimestamp()) / 3600;
+            if ($stage === 'end_exposure') {
+                if ($at < self::exposureEnd($t)) { throw new InvalidArgumentException('End-of-exposure readings are taken once the full exposure period has run (including any top-up extension).'); }
+                $hours = (float)$sched['exposure_hours'];   // judged against the original end standard, also after an extension (spec 5.4 #8)
+            }
             $standard = ApStandards::standardAt($rate, $hours, (int)$t['whole_gram'] === 1);
         }
         try { $band = ApStandards::topUpBand($rate, $standard); } catch (InvalidArgumentException $e) { $band = null; }
@@ -366,6 +370,9 @@ final class ApTreatments
         }
         $last = self::lastEndSet($treatmentId);
         if (!$last) { throw new ApTreatmentError('Record the end-of-exposure readings before closing.'); }
+        if (new DateTimeImmutable($last['_taken_at'], new DateTimeZone('UTC')) < self::exposureEnd($t)) {
+            throw new ApTreatmentError('Record end-of-exposure readings taken after the full exposure period (including any top-up extension) before closing.');
+        }
 
         $sched = self::schedule($t);
         $standardFailure = false;
@@ -447,7 +454,7 @@ final class ApTreatments
             if ($note === '') { throw new InvalidArgumentException('A manual forecast needs a note saying where it came from.'); }
             $min = (float)$f['manual_min_c'];
             self::plausibleTemp($min, 'Forecast temperature');
-            $retrieved = !empty($f['retrieved_at']) ? new DateTimeImmutable((string)$f['retrieved_at'], $utc) : $now;
+            $retrieved = $now;   // a typed forecast is dated when it is entered; a client-supplied time would bypass the freshness rule
             return [$min, 'manual: ' . $note, $retrieved, ['source' => 'manual', 'note' => $note, 'min_c' => $min, 'retrieved_at' => $retrieved->setTimezone($utc)->format('Y-m-d H:i:s')]];
         }
         $hourly = $f['hourly'] ?? null;
@@ -465,8 +472,17 @@ final class ApTreatments
     /** @return array<string,mixed> */
     private static function lastEndSet(string $treatmentId): ?array
     {
-        $r = ApDb::get()->fetchOne("SELECT result_json FROM ap_reading_sets WHERE treatment_id = ? AND stage = 'end_exposure' ORDER BY taken_at DESC, created_at DESC", [$treatmentId]);
-        return $r ? json_decode((string)$r['result_json'], true) : null;
+        $r = ApDb::get()->fetchOne("SELECT result_json, taken_at FROM ap_reading_sets WHERE treatment_id = ? AND stage = 'end_exposure' ORDER BY taken_at DESC, created_at DESC", [$treatmentId]);
+        if (!$r) { return null; }
+        $d = json_decode((string)$r['result_json'], true);
+        $d['_taken_at'] = (string)$r['taken_at'];
+        return $d;
+    }
+
+    /** The only forecast a client may send itself: a typed minimum and its source note. Anything else is dropped. */
+    public static function sanitizeClientForecast(mixed $f): array
+    {
+        return is_array($f) ? array_intersect_key($f, ['manual_min_c' => 1, 'source_note' => 1]) : [];
     }
 
     private static function exposureEnd(array $t): DateTimeImmutable

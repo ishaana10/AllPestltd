@@ -45,6 +45,7 @@ try {
             echo json_encode(['recorded' => $signing->officerSign($tid, (string)($_POST['name'] ?? ''), (string)($_POST['designation'] ?? ''), (string)($_POST['png'] ?? ''), $userId, $now)]);
             break;
         case 'correct':
+            ApAccess::guard('admin.correct');   // a technician must not rewrite their own signed record
             $changes = json_decode((string)($_POST['changes'] ?? ''), true);
             echo json_encode(['version' => $signing->correct($tid, is_array($changes) ? $changes : [], (string)($_POST['reason'] ?? ''), $userId)]);
             break;

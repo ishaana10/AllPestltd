@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/ApId.php';
 require_once __DIR__ . '/ApDb.php';
+require_once __DIR__ . '/ApNum.php';
 require_once __DIR__ . '/ApUploads.php';
 require_once __DIR__ . '/ApTechnicians.php';
 require_once __DIR__ . '/ApTreatments.php';
@@ -106,6 +107,54 @@ final class ApSigning
      * @param array<string,mixed> $changes only treatment-level fields in the whitelist
      * @return int the new version number
      */
+    /** Every corrected value is checked and normalised like the original entry: nothing odd reaches a signed record. */
+    private function validateChanges(array $changes): array
+    {
+        $db = ApDb::get();
+        $out = [];
+        foreach ($changes as $k => $v) {
+            switch ($k) {
+                case 'height_m': case 'depth_m': case 'length_m': case 'volume_m3': case 'dose_rate_used': case 'dose_g': case 'applied_g':
+                    $out[$k] = ApNum::strict($v, $k);
+                    if ($out[$k] <= 0) { throw new InvalidArgumentException("$k must be greater than 0."); }
+                    break;
+                case 'mb_fraction':
+                    $out[$k] = ApNum::strict($v, $k);
+                    if ($out[$k] <= 0 || $out[$k] > 1) { throw new InvalidArgumentException('mb_fraction must be above 0 and at most 1.'); }
+                    break;
+                case 'site_lat': case 'site_lng':
+                    $out[$k] = ApNum::strict($v, $k);
+                    if (abs($out[$k]) > ($k === 'site_lat' ? 90 : 180)) { throw new InvalidArgumentException("$k is out of range."); }
+                    break;
+                case 'fumigation_type':
+                    if (!in_array($v, ['ambient', 'controlled'], true)) { throw new InvalidArgumentException('fumigation_type must be ambient or controlled.'); }
+                    $out[$k] = $v;
+                    break;
+                case 'enclosure_type':
+                    if (!is_string($v) || trim($v) === '' || strlen($v) > 30) { throw new InvalidArgumentException('enclosure_type must be a short, non-empty value.'); }
+                    $out[$k] = trim($v);
+                    break;
+                case 'scheduled_start':
+                    $d = is_string($v) ? DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $v, new DateTimeZone('UTC')) : false;
+                    if (!$d || $d->format('Y-m-d H:i:s') !== $v) { throw new InvalidArgumentException('scheduled_start must be a UTC date and time (YYYY-MM-DD HH:MM:SS).'); }
+                    $out[$k] = $v;
+                    break;
+                case 'equipment_ids':
+                    if (!is_array($v) || !$v) { throw new InvalidArgumentException('equipment_ids must list at least one piece of equipment.'); }
+                    foreach ($v as $id) {
+                        if (!is_string($id) || !$db->fetchOne('SELECT id FROM ap_equipment WHERE id = ?', [$id])) { throw new InvalidArgumentException('Unknown equipment in equipment_ids.'); }
+                    }
+                    $out[$k] = json_encode(array_values($v));
+                    break;
+                case 'officer_id':
+                    if (!is_string($v) || !$db->fetchOne('SELECT id FROM ap_officers WHERE id = ?', [$v])) { throw new InvalidArgumentException('Unknown officer.'); }
+                    $out[$k] = $v;
+                    break;
+            }
+        }
+        return $out;
+    }
+
     public function correct(string $treatmentId, array $changes, string $reason, string $userId): int
     {
         $db = ApDb::get();
@@ -116,6 +165,7 @@ final class ApSigning
         foreach (array_keys($changes) as $k) {
             if (!in_array($k, self::CORRECTABLE, true)) { throw new InvalidArgumentException("The field '$k' cannot be corrected here."); }
         }
+        $changes = $this->validateChanges($changes);
         $n = (int)$t['version'];
         $snapshot = [
             'treatment' => $t,
