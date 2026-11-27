@@ -292,4 +292,21 @@ final class ApSigningTest extends TestCase
         $this->assertStringNotContainsString("(r.skipped || []).length", $js, 'skipped is an object keyed by container, so .length is undefined');
         $this->assertStringContainsString('Object.keys(sk)', $js);
     }
+
+    public function testIssueMessageSaysWhenCertificatesAlreadyExist(): void
+    {
+        $js = (string)file_get_contents(dirname(__DIR__, 3) . '/assets/js/allpest/signing.js');
+        $this->assertStringContainsString('r.existing', $js);
+        $this->assertStringContainsString('already issued', $js);
+    }
+
+    public function testSigningResultsAreShownNextToTheButtons(): void
+    {
+        $js = (string)file_get_contents(dirname(__DIR__, 3) . '/assets/js/allpest/signing.js');
+        $this->assertStringContainsString("failNote('fsign')", $js);
+        $this->assertStringContainsString("failNote('osign')", $js);
+        $this->assertStringContainsString("note('fsign'", $js);
+        $ui = (string)file_get_contents(dirname(__DIR__, 3) . '/modules/allpest_work/allpest_work.php');
+        $this->assertStringContainsString('otherwise leave empty', $ui);
+    }
 }

@@ -35,7 +35,7 @@ $sets = ['compress.js', 'queue.js', 'signpad.js', 'signing.js', 'rof.js'];
       <div class="ap-card"><h2>5. Signing</h2><div id="state"></div></div>
       <div class="ap-card" id="fum"><h2>Fumigator signature</h2>
         <label class="ap-field"><span>Your password</span><input id="pw" type="password" autocomplete="current-password"></label>
-        <label class="ap-field"><span>Authenticator code (if you use one)</span><input id="mfa" inputmode="numeric" autocomplete="one-time-code"></label>
+        <label class="ap-field"><span>Authenticator code (only if your account uses an authenticator app; 6 digits, otherwise leave empty)</span><input id="mfa" inputmode="numeric" autocomplete="one-time-code"></label>
         <button class="ap-btn" id="fsign">Sign as fumigator</button></div>
       <div class="ap-card" id="off"><h2>Supervising officer signature</h2>
         <p class="ap-muted">Hand the tablet to the officer. They sign with a finger or stylus.</p>
