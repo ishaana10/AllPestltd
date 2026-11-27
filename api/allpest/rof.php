@@ -5,7 +5,7 @@ require_once dirname(__DIR__, 2) . '/core/module_bootstrap.php';
 require_once dirname(__DIR__, 2) . '/core/allpest/ApAccess.php';
 foreach (['ApId', 'ApSchema', 'ApDb', 'ApSettings', 'ApUploads', 'ApRequests', 'ApNum', 'ApTreatments', 'ApRof'] as $c) { require_once dirname(__DIR__, 2) . "/core/allpest/$c.php"; }
 
-header('Content-Type: application/json');
+header('Content-Type: application/json');   // the PDF branch below replaces this
 $db = NuDatabase::getInstance();
 ApSchema::ensure($db);
 ApDb::set($db);
@@ -24,6 +24,15 @@ try {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $id = (string)($_GET['id'] ?? '');
         ApAccess::guard('treatment.view', $id);
+        if (!empty($_GET['pdf'])) {
+            require_once dirname(__DIR__, 2) . '/core/allpest/ApRofRenderer.php';
+            $pdf = ApRofRenderer::render(ApRof::pdfData($id));
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: attachment; filename="record-of-fumigation.pdf"');
+            header('X-Content-Type-Options: nosniff');
+            echo $pdf;
+            exit;
+        }
         echo json_encode(ApRof::document($id));
         exit;
     }

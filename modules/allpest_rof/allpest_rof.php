@@ -114,7 +114,7 @@ if (!ApAccess::can($uid, 'admin.pages') && !ApAccess::can($uid, 'treatment.recor
       '<tr><td>Government officer if supervised</td><td colspan="2">' + v(E.officer.full_name || '') + (E.officer.designation ? ', ' + v(E.officer.designation) : '') + '</td></tr></table>';
     var nextStep = {planned: 'Do the pre-treatment check.', prechecked: 'Apply the gas and record the dose.', dosed: 'Take the start-point readings.', exposure: 'Take exposure readings, then top-up if needed and start ventilation.', ventilating: 'Record the TLV readings, then close the treatment.', closed: 'Sign the record and issue certificates.'}[d.status] || '';
     h += '<p class="noprint">Status: <strong>' + esc(d.status) + '</strong>' + (nextStep && !dis ? '. Next: ' + esc(nextStep) : '') + '</p>';
-    h += '<p class="noprint">' + (dis ? '' : '<button class="ap-btn" id="goWork">Record dosing, readings, top-up and TLV</button> ') + '<button class="ap-btn" onclick="window.print()">Print</button> <button class="ap-btn" id="backList">All records</button></p>';
+    h += '<p class="noprint">' + (dis ? '' : '<button class="ap-btn" id="goWork">Record dosing, readings, top-up and TLV</button> ') + '<button class="ap-btn" onclick="window.print()">Print</button> <a class="ap-btn" href="api/allpest/rof.php?id=' + encodeURIComponent(tid) + '&pdf=1">Download PDF</a> <button class="ap-btn" id="backList">All records</button></p>';
     $('doc').innerHTML = h; $('doc').hidden = false; $('pick').hidden = true;
     var gw = $('goWork'); if (gw) { gw.onclick = function () { window.AP_NEXT = tid; NuApp.loadModule('allpest_work'); }; }
     var bl = $('backList'); if (bl) { bl.onclick = function () { NuApp.loadModule('allpest_rof'); }; }
