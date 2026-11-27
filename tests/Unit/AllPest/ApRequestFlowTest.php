@@ -200,4 +200,12 @@ final class ApRequestFlowTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         ApRequests::createTreatment($this->reqId, [$this->cons[0]], $this->plan());
     }
+
+    public function testRequestDetailListsEachTreatmentWithItsContainers(): void
+    {
+        $src = (string)file_get_contents(dirname(__DIR__, 3) . '/api/allpest/requests.php');
+        $this->assertStringContainsString("\$tr['containers']", $src);
+        $board = (string)file_get_contents(dirname(__DIR__, 3) . '/modules/allpest_board/allpest_board.php');
+        $this->assertStringContainsString('t.containers', $board);
+    }
 }

@@ -56,7 +56,7 @@ $e = fn ($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
   function render(r, o) {
     var h = '<h2>' + esc(r.reference) + ' · ' + esc(r.customer_name) + ' <span class="ap-muted">(' + esc(r.status) + ')</span></h2>';
     h += '<p>' + esc(r.site_address || '') + '</p><p class="ap-muted">Containers: ' + (r.consignments.length ? r.consignments.map(function (c) { return esc(c.container_no) + (c.treatment_id ? ' ✓' : ''); }).join(', ') : 'none yet (they are imported when you confirm)') + '</p>';
-    if (r.treatments.length) { h += '<p>Treatments: ' + r.treatments.map(function (t) { return '<a href="#" class="ap-rof" data-id="' + esc(t.id) + '">' + esc(t.rof_type) + ' · ' + esc(t.status) + '</a>'; }).join(' · ') + '</p>'; }
+    if (r.treatments.length) { h += '<p>Records of fumigation (one per container when un-sheeted):<br>' + r.treatments.map(function (t) { return '<a href="#" class="ap-rof" data-id="' + esc(t.id) + '">' + esc((t.containers || []).join(', ') || t.rof_type) + ' · ' + esc(t.status) + '</a>'; }).join('<br>') + '</p>'; }
     if (r.status === 'new') {
       h += '<p><button class="ap-btn" id="ap-confirm" type="button">Confirm request</button></p>';
     } else if (r.status === 'confirmed' || r.status === 'scheduled') {

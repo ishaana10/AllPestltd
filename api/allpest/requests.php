@@ -19,6 +19,12 @@ try {
             if (!$req) { http_response_code(404); echo json_encode(['error' => 'Not found']); exit; }
             $req['consignments'] = $db->fetchAll('SELECT c.*, tc.treatment_id FROM ap_consignments c LEFT JOIN ap_treatment_containers tc ON tc.consignment_id = c.id WHERE c.request_id = ? ORDER BY c.container_no', [$id]);
             $req['treatments'] = $db->fetchAll('SELECT id, rof_type, status, technician_id, scheduled_start FROM ap_treatments WHERE request_id = ? ORDER BY scheduled_start', [$id]);
+            foreach ($req['treatments'] as &$tr) {
+                $cn = $db->fetchAll('SELECT c.container_no FROM ap_treatment_containers tc JOIN ap_consignments c ON c.id = tc.consignment_id WHERE tc.treatment_id = ? ORDER BY c.container_no', [$tr['id']]);
+                $tr['containers'] = array_column($cn, 'container_no');
+            }
+            unset($tr);
+            usort($req['treatments'], fn ($a, $b) => strcmp((string)($a['containers'][0] ?? ''), (string)($b['containers'][0] ?? '')));
             echo json_encode($req);
         } else {
             $st = (string)($_GET['status'] ?? '');
