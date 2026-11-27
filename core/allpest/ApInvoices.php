@@ -58,17 +58,28 @@ final class ApInvoices
     {
         $db = ApDb::get();
         $link = $db->fetchOne('SELECT * FROM ap_invoice_links WHERE request_id = ?', [$requestId]);
-        if ($link && $link['state'] !== 'pending') { return; }
+        if ($link && $link['state'] !== 'pending' && $link['state'] !== 'sending') { return; }
 
         $treatments = $db->fetchAll('SELECT id, status, rof_type FROM ap_treatments WHERE request_id = ?', [$requestId]);
         if (!$treatments) { return; }
         foreach ($treatments as $t) { if ($t['status'] !== 'closed') { return; } }
+        $uncovered = $db->fetchOne('SELECT COUNT(*) AS n FROM ap_consignments c WHERE c.request_id = ? AND NOT EXISTS (SELECT 1 FROM ap_treatment_containers tc WHERE tc.consignment_id = c.id)', [$requestId]);
+        if ((int)$uncovered['n'] > 0) { return; }   // never invoice a partial request, whoever asks (close, cron or an admin retry)
 
-        $now = self::now()->format('Y-m-d H:i:s');
+        $nowDt = self::now();
+        $now = $nowDt->format('Y-m-d H:i:s');
         if (!$link) {
-            $db->insert('ap_invoice_links', ['id' => ApId::uuid(), 'request_id' => $requestId, 'state' => 'pending', 'attempts' => 0, 'created_at' => $now, 'updated_at' => $now]);
-            $link = $db->fetchOne('SELECT * FROM ap_invoice_links WHERE request_id = ?', [$requestId]);
+            try {
+                $db->insert('ap_invoice_links', ['id' => ApId::uuid(), 'request_id' => $requestId, 'state' => 'pending', 'attempts' => 0, 'created_at' => $now, 'updated_at' => $now]);
+            } catch (Throwable $e) {
+                return;   // another process created the link a moment ago: it is the one that sends
+            }
         }
+        // Claim the link atomically so concurrent callers cannot both call ERPX. A claim abandoned by a crashed process is taken over after 10 minutes.
+        $stale = $nowDt->modify('-10 minutes')->format('Y-m-d H:i:s');
+        $claimed = $db->update('ap_invoice_links', ['state' => 'sending', 'updated_at' => $now], "request_id = ? AND (state = 'pending' OR (state = 'sending' AND updated_at <= ?))", [$requestId, $stale]);
+        if ($claimed !== 1) { return; }
+        $link = $db->fetchOne('SELECT * FROM ap_invoice_links WHERE request_id = ?', [$requestId]);
 
         try {
             $inv = self::send($requestId, $treatments);
@@ -78,7 +89,7 @@ final class ApInvoices
             $attempts = (int)$link['attempts'] + 1;
             $delay = min(21600, 60 * (2 ** ($attempts - 1)));
             $db->update('ap_invoice_links', [
-                'attempts' => $attempts, 'last_error' => substr($e->getMessage(), 0, 500),
+                'state' => 'pending', 'attempts' => $attempts, 'last_error' => substr($e->getMessage(), 0, 500),
                 'next_attempt_at' => self::now()->modify("+{$delay} seconds")->format('Y-m-d H:i:s'), 'updated_at' => $now,
             ], 'id = ?', [$link['id']]);
         }
@@ -148,12 +159,12 @@ final class ApInvoices
     public static function retryPending(): int
     {
         $db = ApDb::get();
-        $due = $db->fetchAll("SELECT request_id FROM ap_invoice_links WHERE state = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= ?) ORDER BY created_at", [self::now()->format('Y-m-d H:i:s')]);
+        $due = $db->fetchAll("SELECT request_id FROM ap_invoice_links WHERE (state = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)) OR (state = 'sending' AND updated_at <= ?) ORDER BY created_at", [self::now()->format('Y-m-d H:i:s'), self::now()->modify('-10 minutes')->format('Y-m-d H:i:s')]);
         $ok = 0;
         foreach ($due as $d) {
             self::raiseForRequest((string)$d['request_id']);
             $l = $db->fetchOne('SELECT state FROM ap_invoice_links WHERE request_id = ?', [$d['request_id']]);
-            if ($l && $l['state'] !== 'pending') { $ok++; }
+            if ($l && $l['state'] !== 'pending' && $l['state'] !== 'sending') { $ok++; }
         }
         return $ok;
     }

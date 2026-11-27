@@ -142,6 +142,23 @@ final class ApInvoicesTest extends TestCase
         $this->assertNull($this->db->fetchOne('SELECT id FROM ap_invoice_links WHERE request_id = ?', [$this->reqId]));
     }
 
+    public function testAClaimedLinkIsNotSentTwiceAndAConsignmentWithoutATreatmentBlocksInvoicing(): void
+    {
+        $this->treatment('general', ['pass']);
+        $this->raise();                                          // one invoice, draft
+        $this->db->exec("UPDATE ap_invoice_links SET state = 'pending', erpx_invoice_id = NULL");
+        $this->db->exec("UPDATE ap_invoice_links SET state = 'sending', updated_at = '" . gmdate('Y-m-d H:i:s', $this->now) . "'");   // another worker is mid-send
+        $before = count($this->calls);
+        $this->raise();
+        $this->assertSame($before, count($this->calls), 'a link another process is sending must not be sent again');
+        // admin "retry" with a consignment that has no treatment yet must not invoice a partial request
+        $this->db->exec("UPDATE ap_invoice_links SET state = 'pending'");
+        $this->db->insert('ap_consignments', ['id' => ApId::uuid(), 'request_id' => $this->reqId, 'container_no' => 'MSKU0000099', 'created_at' => '2099-01-01 00:00:00']);
+        $before = count($this->calls);
+        $this->raise();
+        $this->assertSame($before, count($this->calls), 'every consignment must be covered before invoicing');
+    }
+
     public function testReleaseCallsErpxOnceEvenWhenRepeated(): void
     {
         $this->treatment('general', ['pass']);
