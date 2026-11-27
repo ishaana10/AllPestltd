@@ -31,7 +31,9 @@ window.ApSigning = (function () {
         var ch = {}; ch[$('cf').value] = $('cv').value;
         U.post('sign.php', { action: 'correct', treatment_id: id, changes: JSON.stringify(ch), reason: $('cr').value }).then(function (r) { U.toast('Corrected: version ' + r.version + '. Sign again.'); load(); }, U.fail);
       };
-      $('issue').onclick = function () { U.post('certificates.php', { action: 'issue', treatment_id: id }).then(function (r) { U.toast('Issued ' + (r.issued || []).length + ', waiting ' + (r.skipped || []).length); load(); }, U.fail); };
+      $('issue').onclick = function () { U.post('certificates.php', { action: 'issue', treatment_id: id }).then(function (r) { var sk = r.skipped || {}, ids = Array.isArray(sk) ? sk : Object.keys(sk), why = {};
+          ids.forEach(function (k) { (Array.isArray(sk) ? [] : (sk[k] || [])).forEach(function (m) { why[String(m).replace(/_/g, ' ')] = 1; }); });
+          U.toast('Issued ' + (r.issued || []).length + (ids.length ? ', ' + ids.length + ' not ready' + (Object.keys(why).length ? ' (waiting for: ' + Object.keys(why).join(', ') + ')' : '') : '')); load(); }, U.fail); };
       $('resend').onclick = function () { U.post('certificates.php', { action: 'resend_pending' }).then(function (r) { U.toast('Sent ' + r.sent); load(); }, U.fail); };
       $('pack').href = (window.AP_API || '../../api/allpest/') + 'audit_pack.php?treatment_id=' + encodeURIComponent(id);
     }

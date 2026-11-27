@@ -285,4 +285,11 @@ final class ApSigningTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->sign->correct($this->tid, [], 'reason', 'user-1');
     }
+
+    public function testIssueMessageHandlesSkippedAsAContainerMap(): void
+    {
+        $js = (string)file_get_contents(dirname(__DIR__, 3) . '/assets/js/allpest/signing.js');
+        $this->assertStringNotContainsString("(r.skipped || []).length", $js, 'skipped is an object keyed by container, so .length is undefined');
+        $this->assertStringContainsString('Object.keys(sk)', $js);
+    }
 }
