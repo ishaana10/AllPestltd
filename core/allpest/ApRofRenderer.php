@@ -37,7 +37,7 @@ final class ApRofRenderer
             . '<tr>' . $cell('Street address', $B['street'] ?? '') . '<td width="50%"><span style="font-size:7pt;color:#475569">Target of fumigation</span><br/>' . $box('Commodity', in_array('commodity', $targets, true)) . ' ' . $box('Container', in_array('container', $targets, true)) . ' '
                 . $box('Packaging', in_array('packaging', $targets, true)) . ' ' . $box('Other: ' . ($B['target_other'] ?? ''), in_array('other', $targets, true)) . '</td></tr>'
             . '<tr>' . $cell('Suburb/town/city', $B['suburb'] ?? '') . $cell('Country / postcode', trim(($B['country'] ?? '') . ' ' . ($B['postcode'] ?? ''))) . '</tr>'
-            . '<tr>' . $cell('Port of loading', $B['port_of_loading'] ?? '') . '<td width="50%"></td></tr>'
+            . '<tr>' . $cell('Port of loading', $B['port_of_loading'] ?? '') . $cell('Order reference', $B['order_no'] ?? '') . '</tr>'
             . '<tr><td colspan="2"><span style="font-size:7pt;color:#475569">Consignment identification/Container numbers</span><br/>'
             . $e(implode(', ', array_map(fn ($c) => $c['container_no'] . ($c['seal_no'] ? ' (seal ' . $c['seal_no'] . ')' : ''), (array)($B['containers'] ?? [])))) . '</td></tr></table><br/>';
         $s = $C['schedule'] ?? [];

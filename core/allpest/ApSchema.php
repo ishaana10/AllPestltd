@@ -22,7 +22,7 @@ final class ApSchema
             'requests' => ['container_list' => 'TEXT NULL'],
             'consignments' => ['port_of_loading' => 'VARCHAR(100) NULL'],
             // Record of fumigation fields the methodology templates ask for (section B and C of the ROF).
-            'treatments' => ['suitable' => 'TINYINT NULL', 'remedial_action' => 'TEXT NULL', 'heaters_used' => 'TINYINT NULL', 'min_enclosure_temp_c' => 'DECIMAL(5,1) NULL',
+            'treatments' => ['rof_no' => 'VARCHAR(40) NULL', 'suitable' => 'TINYINT NULL', 'remedial_action' => 'TEXT NULL', 'heaters_used' => 'TINYINT NULL', 'min_enclosure_temp_c' => 'DECIMAL(5,1) NULL',
                 'target_of_fumigation' => 'VARCHAR(100) NULL', 'target_other' => 'VARCHAR(200) NULL', 'enclosure_other' => 'VARCHAR(200) NULL', 'consignment_description' => 'TEXT NULL',
                 'loc_street' => 'VARCHAR(200) NULL', 'loc_suburb' => 'VARCHAR(100) NULL', 'loc_country' => 'VARCHAR(100) NULL', 'loc_postcode' => 'VARCHAR(20) NULL',
                 'probe_location' => 'VARCHAR(20) NULL', 'load_factor_max' => 'DECIMAL(5,1) NULL', 'load_factor_est' => 'DECIMAL(5,1) NULL', 'retention_pct' => 'DECIMAL(5,1) NULL', 'ct_product' => 'DECIMAL(8,2) NULL'],
@@ -31,6 +31,19 @@ final class ApSchema
                 try { $db->exec("ALTER TABLE ap_{$table} ADD COLUMN {$col} {$def}"); } catch (Throwable $e) { /* already there */ }
             }
         }
+        self::backfillRofNumbers($db);
+    }
+
+    /** Records made before each one had its own number get {request reference}-{n}, in creation order within the request. */
+    private static function backfillRofNumbers(object $db): void
+    {
+        try {
+            $rows = $db->fetchAll('SELECT t.id, t.request_id, r.reference FROM ap_treatments t JOIN ap_requests r ON r.id = t.request_id WHERE t.rof_no IS NULL ORDER BY t.request_id, t.created_at, t.id');
+            foreach ($rows as $row) {
+                $n = (int)$db->fetchOne('SELECT COUNT(*) AS n FROM ap_treatments WHERE request_id = ? AND rof_no IS NOT NULL', [$row['request_id']])['n'] + 1;
+                $db->exec('UPDATE ap_treatments SET rof_no = ' . $db->getPdo()->quote($row['reference'] . '-' . $n) . ' WHERE id = ' . $db->getPdo()->quote($row['id']));
+            }
+        } catch (Throwable $e) { /* nothing to backfill yet */ }
     }
 
     /** @return array<string,array{0:string,1:array<int,string>}> table => [column definitions, mysql index columns] */

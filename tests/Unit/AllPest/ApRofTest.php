@@ -185,4 +185,12 @@ final class ApRofTest extends TestCase
         foreach (glob($dir . '/{,.}*', GLOB_BRACE) ?: [] as $f) { if (is_file($f)) { @unlink($f); } }
         @rmdir($dir);
     }
+
+    public function testDocumentShowsTheRecordNumberAndTheOrderReference(): void
+    {
+        $d = ApRof::document($this->tid);
+        $ref = (string)$this->db->fetchOne('SELECT reference FROM ap_requests WHERE id = (SELECT request_id FROM ap_treatments WHERE id = ?)', [$this->tid])['reference'];
+        $this->assertSame($ref . '-1', $d['B']['job_no']);
+        $this->assertSame($ref, $d['B']['order_no']);
+    }
 }

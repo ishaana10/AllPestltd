@@ -208,4 +208,25 @@ final class ApRequestFlowTest extends TestCase
         $board = (string)file_get_contents(dirname(__DIR__, 3) . '/modules/allpest_board/allpest_board.php');
         $this->assertStringContainsString('t.containers', $board);
     }
+
+    public function testEachRecordGetsItsOwnNumberLinkedToTheRequestReference(): void
+    {
+        ApRequests::confirm($this->reqId, [], 'admin');
+        $ids = ApRequests::createTreatments($this->reqId, $this->cons, $this->plan(['enclosure_type' => 'container']));
+        $ref = (string)$this->db->fetchOne('SELECT reference FROM ap_requests WHERE id = ?', [$this->reqId])['reference'];
+        $nos = [];
+        foreach ($ids as $tid) { $nos[] = (string)$this->db->fetchOne('SELECT rof_no FROM ap_treatments WHERE id = ?', [$tid])['rof_no']; }
+        $this->assertSame([$ref . '-1', $ref . '-2', $ref . '-3', $ref . '-4'], $nos);
+    }
+
+    public function testExistingRecordsWithoutANumberAreBackfilledInCreationOrder(): void
+    {
+        ApRequests::confirm($this->reqId, [], 'admin');
+        $ids = ApRequests::createTreatments($this->reqId, $this->cons, $this->plan(['enclosure_type' => 'container']));
+        $this->db->exec('UPDATE ap_treatments SET rof_no = NULL');
+        ApSchema::ensure($this->db);
+        $ref = (string)$this->db->fetchOne('SELECT reference FROM ap_requests WHERE id = ?', [$this->reqId])['reference'];
+        $got = array_column($this->db->fetchAll('SELECT rof_no FROM ap_treatments WHERE request_id = ? ORDER BY rof_no', [$this->reqId]), 'rof_no');
+        $this->assertSame([$ref . '-1', $ref . '-2', $ref . '-3', $ref . '-4'], $got);
+    }
 }
