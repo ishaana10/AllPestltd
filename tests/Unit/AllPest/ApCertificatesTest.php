@@ -241,6 +241,17 @@ final class ApCertificatesTest extends TestCase
         $this->assertSame(0, ApCertificates::sendPending());
     }
 
+    public function testChangedDataIsNeverSentAsTheIssuedCertificate(): void
+    {
+        $this->mailFails = true;
+        ApCertificates::issueEligible($this->tid, $this->utc('2026-12-11 13:00:00'));
+        $this->mailFails = false;
+        $this->db->exec("UPDATE ap_treatments SET applied_g = applied_g + 100");          // data altered after issue (e.g. a later correction)
+        $this->assertSame(0, ApCertificates::sendPending());
+        $this->assertCount(0, $this->mails);
+        $this->assertSame(2, (int)$this->db->fetchOne('SELECT COUNT(*) AS n FROM ap_certificates WHERE email_pending = 1')['n']);
+    }
+
     public function testNothingIsIssuedUntilBothSignaturesExist(): void
     {
         $this->db->exec("DELETE FROM ap_signatures WHERE role = 'officer'");

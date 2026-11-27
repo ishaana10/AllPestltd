@@ -201,6 +201,10 @@ final class ApCertificates
             $attachments = [];
             $numbers = [];
             foreach ($certs as $c) {
+                if (self::recomputeHash((string)$c['container_id']) !== (string)$c['content_sha256']) {
+                    ApTreatments::audit('certificate.integrity_mismatch', (string)$c['treatment_id'], ['container_id' => $c['container_id'], 'number' => $c['number']]);
+                    throw new RuntimeException('Certificate ' . $c['number'] . ' no longer matches the content issued: not sent.');
+                }
                 $attachments[] = ['filename' => 'Certificate-' . $c['number'] . '.pdf', 'mimetype' => 'application/pdf', 'data' => ApCertificateRenderer::render(self::data((string)$c['container_id']))];
                 $numbers[] = (string)$c['number'];
             }
