@@ -42,4 +42,10 @@ final class ApReviewFixesTest extends TestCase
         exec(escapeshellarg($node) . ' ' . escapeshellarg(dirname(__DIR__, 2) . '/js/queue.test.js') . ' 2>&1', $out, $code);
         $this->assertSame(0, $code, implode("\n", $out));
     }
+
+    public function testPublicFormShowsTheServersErrorFieldNotJustMessage(): void
+    {
+        $page = (string)file_get_contents(dirname(__DIR__, 3) . '/public_allpest_request.php');
+        $this->assertStringContainsString('j.message||j.error', $page);
+    }
 }

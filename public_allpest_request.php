@@ -110,7 +110,7 @@ button.secondary{background:#eef2ee;color:#1c2a22;border:1px solid #9fb0a5}
    .then(function(r){return r.json().catch(function(){return{success:false,message:'Unexpected reply.'};});})
    .then(function(j){
     if(j.success){f.style.display='none';show('Thank you. Your request reference is '+j.reference+'. We emailed you a confirmation.','ok');}
-    else{go.disabled=false;show(j.message||'Could not send your request.','err');}
+    else{go.disabled=false;show(j.message||j.error||'Could not send your request. If you are signed in to the staff system, open this page in a private window.','err');}
    }).catch(function(){go.disabled=false;show('Network problem. Please try again.','err');});
  });
 })();
