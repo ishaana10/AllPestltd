@@ -25,7 +25,7 @@ final class ApScreensTest extends TestCase
         foreach ($this->pages() as $p) {
             $src = (string)file_get_contents($p);
             $this->assertStringContainsString('core/module_bootstrap.php', $src, basename($p));
-            $this->assertStringContainsString('ap_page_start(', $src, basename($p));
+            if (basename($p) !== 'allpest.php') { $this->assertStringContainsString('ap_page_start(', $src, basename($p)); }   // allpest.php is the sidebar launcher
         }
         $layout = (string)file_get_contents($this->root . '/modules/allpest/_layout.php');
         $this->assertStringContainsString("ApAccess::can(", $layout);

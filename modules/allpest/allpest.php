@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once dirname(__DIR__, 2) . '/core/module_bootstrap.php';
 /** Sidebar entry: the All Pest screens are standalone, tablet-first pages, so this fragment hands over to them. */
 ?>
 <div style="padding:32px;text-align:center">
