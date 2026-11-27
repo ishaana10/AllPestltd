@@ -1,0 +1,17 @@
+:root{--ap-bg:#f4f6f8;--ap-card:#fff;--ap-ink:#1b2430;--ap-mute:#64748b;--ap-line:#d8dee6;--ap-main:#0f766e;--ap-bad:#dc2626;--ap-ok:#16a34a}
+*{box-sizing:border-box}body{margin:0;background:var(--ap-bg);color:var(--ap-ink);font:16px/1.45 system-ui,sans-serif}
+.ap-nav{display:flex;gap:4px;flex-wrap:wrap;background:#0b3b38;padding:6px}.ap-nav a{color:#fff;text-decoration:none;padding:12px 16px;border-radius:8px;min-height:44px}.ap-nav a:hover{background:#14625d}
+.ap-main{max-width:960px;margin:0 auto;padding:16px}h1{font-size:22px;margin:8px 0 16px}h2{font-size:18px;margin:20px 0 8px}
+.ap-card{background:var(--ap-card);border:1px solid var(--ap-line);border-radius:12px;padding:14px;margin-bottom:14px}
+.ap-muted{color:var(--ap-mute)}.ap-table{width:100%;border-collapse:collapse;background:var(--ap-card)}.ap-table th,.ap-table td{padding:10px;border-bottom:1px solid var(--ap-line);text-align:left;vertical-align:top}
+.ap-field{display:block;margin:10px 0}.ap-field span{display:block;font-weight:600;margin-bottom:4px}
+input,select,textarea{width:100%;min-height:48px;padding:10px;font-size:18px;border:1px solid var(--ap-line);border-radius:8px;background:#fff}
+.ap-btn{min-height:52px;padding:12px 22px;font-size:18px;font-weight:600;color:#fff;background:var(--ap-main);border:0;border-radius:10px;cursor:pointer;margin:6px 6px 6px 0}
+.ap-btn.alt{background:#475569}.ap-btn.warn{background:var(--ap-bad)}.ap-btn:disabled{opacity:.5}
+.ap-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.ap-reading{font-size:24px;text-align:center}.ap-reading.low{background:#fee2e2;border-color:var(--ap-bad);color:#7f1d1d}.ap-reading.ok{background:#dcfce7;border-color:var(--ap-ok)}
+.ap-alert{background:#fee2e2;border:2px solid var(--ap-bad);color:#7f1d1d;border-radius:10px;padding:12px;font-weight:600;margin:10px 0}
+.ap-badge{display:inline-block;padding:2px 10px;border-radius:99px;background:#e2e8f0;font-size:13px}.ap-badge.pass{background:#dcfce7}.ap-badge.fail{background:#fee2e2}
+.ap-toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(120px);background:#1e293b;color:#fff;padding:14px 22px;border-radius:10px;transition:transform .2s;z-index:9;max-width:90%}
+.ap-toast.show{transform:translateX(-50%) translateY(0)}.ap-toast.bad{background:var(--ap-bad)}
+canvas.ap-sign{width:100%;height:220px;background:#fff;border:2px dashed var(--ap-line);border-radius:10px}

@@ -449,4 +449,18 @@ final class ApTreatmentsTest extends TestCase
         foreach (['treatment.prechecked', 'treatment.dosed', 'treatment.readings', 'treatment.ventilation'] as $a) { $this->assertContains($a, $actions); }
         foreach ($this->audit as [$a, $tid]) { $this->assertSame($this->tid, $tid); }
     }
+    public function testLiveViewGivesTheStandardTheTabletShowsBeforeTyping(): void
+    {
+        $this->precheck();
+        ApTreatments::recordDosing($this->tid, $this->utc('2026-12-10 06:00:00'), 3700.0, $this->lot);
+        $v = ApTreatments::liveView($this->tid, $this->utc('2026-12-10 06:30:00'));
+        $this->assertSame('start_point', $v['stage']);
+        $this->assertEqualsWithDelta(40.8, $v['standard'], 0.001);
+        $this->assertGreaterThanOrEqual(3, $v['required_locations']);
+        $this->assertGreaterThan(0.0, $v['topup_min']);
+        $this->assertTrue($this->set('sp1', 'start_point', '2026-12-10 06:30:00', $this->all('45', '45', '45'))['startPointReached']);
+        $e = ApTreatments::liveView($this->tid, $this->utc('2026-12-11 06:30:00'));
+        $this->assertSame('exposure', $e['stage']);
+        $this->assertEqualsWithDelta(14.4, $e['standard'], 0.001);
+    }
 }

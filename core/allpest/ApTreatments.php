@@ -401,6 +401,40 @@ final class ApTreatments
         return $res;
     }
 
+    /**
+     * What the tablet shows while readings are typed: the standard that applies right now and the top-up band, so a
+     * reading below standard turns red before it is saved. The same arithmetic recordReadingSet uses.
+     * @return array{stage:string,standard:?float,topup_min:?float,topup_max:?float,required_locations:int,topups_allowed:bool,readings_due_hours:float[]}
+     */
+    public static function liveView(string $treatmentId, DateTimeImmutable $now): array
+    {
+        $t = self::load($treatmentId);
+        $sched = self::schedule($t);
+        $rate = (float)$t['dose_rate_used'];
+        $stage = $t['start_point_at'] === null ? 'start_point' : 'exposure';
+        $standard = null;
+        if ($rate > 0 && $t['injected_at'] !== null) {
+            $utc = new DateTimeZone('UTC');
+            if ($stage === 'start_point') {
+                $inj = new DateTimeImmutable((string)$t['injected_at'], $utc);
+                $standard = ApStandards::startPointStandard($rate, ($now->getTimestamp() - $inj->getTimestamp()) / 60, $sched['retention_class'] === 'eighty');
+            } else {
+                $sp = new DateTimeImmutable((string)$t['start_point_at'], $utc);
+                $standard = ApStandards::standardAt($rate, max(0.0, ($now->getTimestamp() - $sp->getTimestamp()) / 3600), (int)$t['whole_gram'] === 1);
+            }
+        }
+        $band = null;
+        if ($standard !== null) { try { $band = ApStandards::topUpBand($rate, $standard); } catch (InvalidArgumentException $e) { $band = null; } }
+        $volume = (float)$t['volume_m3'];
+        $tcs = (int)ApDb::get()->fetchOne('SELECT COUNT(*) AS n FROM ap_treatment_containers WHERE treatment_id = ?', [$treatmentId])['n'];
+        $required = $volume > 0 ? ApReadings::requiredLocations((string)$t['rof_type'], $volume, 1, $tcs > 1) : 1;
+        return [
+            'stage' => $stage, 'standard' => $standard, 'topup_min' => $band['min'] ?? null, 'topup_max' => $band['max'] ?? null,
+            'required_locations' => max(3, $required), 'topups_allowed' => (int)$sched['topups_allowed'] === 1,
+            'readings_due_hours' => ApReadings::readingsDue((float)$sched['exposure_hours']),
+        ];
+    }
+
     // ---- helpers -------------------------------------------------------------------------------------------------
 
     /** @return array{0:float,1:string,2:DateTimeImmutable,3:array<string,mixed>} lowest temperature, source text, retrieved-at, stored document */
