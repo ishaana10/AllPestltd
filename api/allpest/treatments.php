@@ -6,7 +6,7 @@ declare(strict_types=1);
  */
 require_once dirname(__DIR__, 2) . '/core/module_bootstrap.php';
 require_once dirname(__DIR__, 2) . '/core/allpest/ApAccess.php';
-foreach (['ApId', 'ApSchema', 'ApDb', 'ApSettings', 'ApUploads', 'ApRequests', 'ApNum', 'ApTreatments', 'ApStock'] as $c) { require_once dirname(__DIR__, 2) . "/core/allpest/$c.php"; }
+foreach (['ApId', 'ApSchema', 'ApDb', 'ApSettings', 'ApUploads', 'ApRequests', 'ApNum', 'ApTreatments', 'ApStock', 'ApErpxClient', 'ApInvoices'] as $c) { require_once dirname(__DIR__, 2) . "/core/allpest/$c.php"; }
 
 /** Fetch the forecast on the server (never trusted from the tablet) for the treatment's site and exposure window. */
 function apFetchForecast(object $db, string $tid, DateTimeZone $utc): array
