@@ -18,7 +18,15 @@ final class ApSchema
             $db->exec("CREATE TABLE IF NOT EXISTS ap_{$name} ({$columns}{$extra}){$suffix}");
         }
         // Columns added after the first release (installs made before then do not have them).
-        foreach (['requests' => ['container_list' => 'TEXT NULL']] as $table => $cols) {
+        foreach ([
+            'requests' => ['container_list' => 'TEXT NULL'],
+            'consignments' => ['port_of_loading' => 'VARCHAR(100) NULL'],
+            // Record of fumigation fields the methodology templates ask for (section B and C of the ROF).
+            'treatments' => ['suitable' => 'TINYINT NULL', 'remedial_action' => 'TEXT NULL', 'heaters_used' => 'TINYINT NULL', 'min_enclosure_temp_c' => 'DECIMAL(5,1) NULL',
+                'target_of_fumigation' => 'VARCHAR(100) NULL', 'target_other' => 'VARCHAR(200) NULL', 'enclosure_other' => 'VARCHAR(200) NULL', 'consignment_description' => 'TEXT NULL',
+                'loc_street' => 'VARCHAR(200) NULL', 'loc_suburb' => 'VARCHAR(100) NULL', 'loc_country' => 'VARCHAR(100) NULL', 'loc_postcode' => 'VARCHAR(20) NULL',
+                'probe_location' => 'VARCHAR(20) NULL', 'load_factor_max' => 'DECIMAL(5,1) NULL', 'load_factor_est' => 'DECIMAL(5,1) NULL', 'retention_pct' => 'DECIMAL(5,1) NULL', 'ct_product' => 'DECIMAL(8,2) NULL'],
+        ] as $table => $cols) {
             foreach ($cols as $col => $def) {
                 try { $db->exec("ALTER TABLE ap_{$table} ADD COLUMN {$col} {$def}"); } catch (Throwable $e) { /* already there */ }
             }
@@ -75,6 +83,7 @@ final class ApSchema
             'certificate_numbers' => [$id . ', number VARCHAR(30) NOT NULL UNIQUE, container_id CHAR(36) NULL, allocated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP', []],
             'invoice_links' => [$id . ', request_id CHAR(36) NOT NULL UNIQUE, state VARCHAR(12) NOT NULL DEFAULT \'pending\', erpx_invoice_id INTEGER NULL, erpx_invoice_no VARCHAR(60) NULL, '
                 . 'attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT NULL, next_attempt_at DATETIME NULL, ' . $created . ', ' . $updated, []],
+            'temp_readings' => [$id . ', treatment_id CHAR(36) NOT NULL, taken_at DATETIME NOT NULL, initials VARCHAR(10) NOT NULL, values_json TEXT NOT NULL, created_by VARCHAR(64) NULL, ' . $created, ['treatment_id']],
             'intake_throttle' => [$id . ', ip VARCHAR(45) NOT NULL, ' . $created, ['ip']],
         ];
     }
