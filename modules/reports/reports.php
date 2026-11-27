@@ -606,7 +606,7 @@ require_once dirname(__DIR__, 2) . '/core/module_bootstrap.php';
         rptSetSql(r.report_sql || '');
         rptSetViewMode(r.report_view_mode || 'table');
         (r.report_columns || []).forEach(function (c) { rptAddColRow(c.field, c.label); });
-        (r.report_filters || []).forEach(function (f) { rptAddFilterRow(f.field, f.label, f.operator); });
+        (r.report_filters || []).forEach(function (f) { rptAddFilterRow(f.field, f.label, f.operator, f.param, f.type); });
 
         // Populate PDF Export Settings
         var pdfSettings = r.report_pdf_settings || {};
@@ -697,18 +697,27 @@ require_once dirname(__DIR__, 2) . '/core/module_bootstrap.php';
     document.getElementById('rptColsList').appendChild(div);
   };
 
-  window.rptAddFilterRow = function (field, label, op) {
-    field = field || ''; label = label || ''; op = op || '=';
+  window.rptAddFilterRow = function (field, label, op, param, type) {
+    field = field || ''; label = label || ''; op = op || '='; param = param || ''; type = type || 'text';
     var div = document.createElement('div');
     div.className = 'rpt-filter-row';
     div.innerHTML =
       '<input type="text" class="nu-input" placeholder="field" value="' + esc(field) + '" data-f-field>' +
       '<input type="text" class="nu-input" placeholder="Label" value="' + esc(label) + '" data-f-label>' +
+      '<input type="text" class="nu-input" placeholder="param (optional)" title="Request key for this filter. Leave empty to use the field name; give two filters on one column different params (e.g. from / to)." value="' + esc(param) + '" data-f-param style="max-width:110px;">' +
+      '<select class="nu-input" data-f-type style="max-width:90px;">' +
+        '<option value="text"'  + (type === 'text'  ? ' selected' : '') + '>text</option>' +
+        '<option value="date"'  + (type === 'date'  ? ' selected' : '') + '>date</option>' +
+        '<option value="month"' + (type === 'month' ? ' selected' : '') + '>month</option>' +
+      '</select>' +
       '<select class="nu-input" data-f-op style="max-width:90px;">' +
         '<option value="="'  + (op === '='    ? ' selected' : '') + '>= exact</option>' +
         '<option value="LIKE"' + (op === 'LIKE' ? ' selected' : '') + '>LIKE</option>' +
         '<option value=">="' + (op === '>='   ? ' selected' : '') + '>&ge;</option>' +
         '<option value="<="' + (op === '<='   ? ' selected' : '') + '>&le;</option>' +
+        '<option value=">"'  + (op === '>'    ? ' selected' : '') + '>&gt;</option>' +
+        '<option value="<"'  + (op === '<'    ? ' selected' : '') + '>&lt;</option>' +
+        '<option value="!="' + (op === '!='   ? ' selected' : '') + '>&ne;</option>' +
       '</select>' +
       '<button class="rpt-remove-btn" onclick="this.parentElement.remove()" title="Remove">✕</button>';
     document.getElementById('rptFiltersList').appendChild(div);
@@ -724,6 +733,8 @@ require_once dirname(__DIR__, 2) . '/core/module_bootstrap.php';
       return {
         field:    row.querySelector('[data-f-field]').value.trim(),
         label:    row.querySelector('[data-f-label]').value.trim(),
+        param:    row.querySelector('[data-f-param]').value.trim(),
+        type:     row.querySelector('[data-f-type]').value,
         operator: row.querySelector('[data-f-op]').value,
       };
     }).filter(function (f) { return f.field; });
@@ -846,7 +857,7 @@ require_once dirname(__DIR__, 2) . '/core/module_bootstrap.php';
           wrap.style.cssText = 'display:flex;flex-direction:column;gap:3px;';
           wrap.innerHTML =
             '<label style="font-size:11px;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;">' + esc(label) + '</label>' +
-            '<input type="text" class="nu-input" id="rptFilter_' + esc(f.field) + '" placeholder="' + esc(f.label || f.field) + '" style="width:160px;">';
+            '<input type="' + (f.type === 'date' ? 'date' : (f.type === 'month' ? 'month' : 'text')) + '" class="nu-input" id="rptFilter_' + esc(f.param || f.field) + '" placeholder="' + esc(f.label || f.field) + '" style="width:160px;">';
           filterBar.appendChild(wrap);
         });
         var runBtn = document.createElement('button');

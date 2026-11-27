@@ -8,6 +8,7 @@ require_once dirname(__DIR__) . '/core/Database.php';
 require_once dirname(__DIR__) . '/core/Auth.php';
 require_once dirname(__DIR__) . '/core/ProjectContext.php';
 require_once dirname(__DIR__) . '/core/CrudGuard.php';
+require_once dirname(__DIR__) . '/core/ReportFilters.php';
 
 ob_clean();
 header('Content-Type: application/json; charset=utf-8');
@@ -227,29 +228,7 @@ try {
             $sql     = $report['report_sql'];
             $filters = json_decode($report['report_filters'] ?? '[]', true) ?: [];
 
-            // Filter field names and operators come from the saved definition: whitelist both
-            // before they are interpolated into SQL (values are always bound).
-            $allowedOps = ['=', 'LIKE', '>=', '<=', '>', '<', '!='];
-            $whereParts = [];
-            $bindings   = [];
-            foreach ($filters as $f) {
-                $field = (string)($f['field'] ?? '');
-                if ($field === '' || !preg_match('/^[A-Za-z0-9_]+$/', $field)) continue;
-                if (isset($filterParams[$field]) && $filterParams[$field] !== '') {
-                    $op = in_array(($f['operator'] ?? '='), $allowedOps, true) ? $f['operator'] : '=';
-                    if ($op === 'LIKE') {
-                        $whereParts[] = "`{$field}` LIKE ?";
-                        $bindings[]   = '%' . $filterParams[$field] . '%';
-                    } else {
-                        $whereParts[] = "`{$field}` {$op} ?";
-                        $bindings[]   = $filterParams[$field];
-                    }
-                }
-            }
-
-            if ($whereParts) {
-                $sql = "SELECT * FROM (" . rtrim((string)$sql, "; \t\n\r") . ") AS _rpt WHERE " . implode(' AND ', $whereParts);
-            }
+            [$sql, $bindings] = NuReportFilters::apply((string)$sql, $filters, $filterParams);
 
             $started = microtime(true);
             $rows    = $db->fetchAll($sql, $bindings);
@@ -319,25 +298,7 @@ try {
             $sql     = $report['report_sql'];
             $filters = json_decode($report['report_filters'] ?? '[]', true) ?: [];
 
-            $whereParts = [];
-            $bindings   = [];
-            foreach ($filters as $f) {
-                $field = $f['field'] ?? '';
-                if ($field && isset($filterParams[$field]) && $filterParams[$field] !== '') {
-                    $op = $f['operator'] ?? '=';
-                    if ($op === 'LIKE') {
-                        $whereParts[] = "`{$field}` LIKE ?";
-                        $bindings[]   = '%' . $filterParams[$field] . '%';
-                    } else {
-                        $whereParts[] = "`{$field}` {$op} ?";
-                        $bindings[]   = $filterParams[$field];
-                    }
-                }
-            }
-
-            if ($whereParts) {
-                $sql = "SELECT * FROM ({$sql}) AS _rpt WHERE " . implode(' AND ', $whereParts);
-            }
+            [$sql, $bindings] = NuReportFilters::apply((string)$sql, $filters, $filterParams);
 
             $rows = $db->fetchAll($sql, $bindings);
 
@@ -383,25 +344,7 @@ try {
             $sql     = $report['report_sql'];
             $filters = json_decode($report['report_filters'] ?? '[]', true) ?: [];
 
-            $whereParts = [];
-            $bindings   = [];
-            foreach ($filters as $f) {
-                $field = $f['field'] ?? '';
-                if ($field && isset($filterParams[$field]) && $filterParams[$field] !== '') {
-                    $op = $f['operator'] ?? '=';
-                    if ($op === 'LIKE') {
-                        $whereParts[] = "`{$field}` LIKE ?";
-                        $bindings[]   = '%' . $filterParams[$field] . '%';
-                    } else {
-                        $whereParts[] = "`{$field}` {$op} ?";
-                        $bindings[]   = $filterParams[$field];
-                    }
-                }
-            }
-
-            if ($whereParts) {
-                $sql = "SELECT * FROM ({$sql}) AS _rpt WHERE " . implode(' AND ', $whereParts);
-            }
+            [$sql, $bindings] = NuReportFilters::apply((string)$sql, $filters, $filterParams);
 
             $rows = $db->fetchAll($sql, $bindings);
 
