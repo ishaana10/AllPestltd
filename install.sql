@@ -713,7 +713,7 @@ CREATE TABLE IF NOT EXISTS `nu_form_share_log` (
 -- ─── CUSTOMER REQUEST CHANNELS ────────────────────────────────────────────────
 -- A reusable "customer request" channel ties together a form (intake), a
 -- workflow (status tracking) and a public share (link + email). One or more
--- per project; fully managed by the Customer Requests module.
+-- per project, fully managed by the Customer Requests module.
 CREATE TABLE IF NOT EXISTS `nu_cr_configs` (
     `cr_id` INT NOT NULL AUTO_INCREMENT,
     `project_id` INT UNSIGNED NOT NULL DEFAULT 1,
