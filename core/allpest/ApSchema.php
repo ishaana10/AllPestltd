@@ -17,6 +17,12 @@ final class ApSchema
             $extra = ($mysql && $keys) ? ', ' . implode(', ', array_map(fn ($k) => "KEY ($k)", $keys)) : '';
             $db->exec("CREATE TABLE IF NOT EXISTS ap_{$name} ({$columns}{$extra}){$suffix}");
         }
+        // Columns added after the first release (installs made before then do not have them).
+        foreach (['requests' => ['container_list' => 'TEXT NULL']] as $table => $cols) {
+            foreach ($cols as $col => $def) {
+                try { $db->exec("ALTER TABLE ap_{$table} ADD COLUMN {$col} {$def}"); } catch (Throwable $e) { /* already there */ }
+            }
+        }
     }
 
     /** @return array<string,array{0:string,1:array<int,string>}> table => [column definitions, mysql index columns] */
@@ -45,7 +51,7 @@ final class ApSchema
             'requests' => [$id . ', reference VARCHAR(30) NOT NULL UNIQUE, job_type VARCHAR(30) NOT NULL DEFAULT \'fumigation\', status VARCHAR(20) NOT NULL DEFAULT \'new\', '
                 . 'customer_name VARCHAR(200) NOT NULL, customer_email VARCHAR(200) NOT NULL, customer_phone VARCHAR(50) NULL, customer_tin VARCHAR(50) NULL, customer_address TEXT NULL, '
                 . 'site_address TEXT NULL, site_lat DECIMAL(9,6) NULL, site_lng DECIMAL(9,6) NULL, requested_date DATE NULL, client_token VARCHAR(64) NULL UNIQUE, '
-                . 'ip VARCHAR(45) NULL, notes TEXT NULL, ' . $created . ', ' . $updated, ['status']],
+                . 'ip VARCHAR(45) NULL, notes TEXT NULL, container_list TEXT NULL, ' . $created . ', ' . $updated, ['status']],
             'consignments' => [$id . ', request_id CHAR(36) NOT NULL, container_no VARCHAR(30) NULL, seal_no VARCHAR(40) NULL, commodity VARCHAR(200) NULL, origin VARCHAR(100) NULL, '
                 . 'destination VARCHAR(100) NULL, quantity VARCHAR(80) NULL, bol_file_id CHAR(36) NULL, ' . $created, ['request_id']],
             'treatments' => [$id . ', request_id CHAR(36) NOT NULL, rof_type VARCHAR(20) NOT NULL DEFAULT \'general\', status VARCHAR(20) NOT NULL DEFAULT \'planned\', '

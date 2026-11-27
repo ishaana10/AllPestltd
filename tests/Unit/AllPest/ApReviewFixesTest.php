@@ -55,4 +55,47 @@ final class ApReviewFixesTest extends TestCase
         $this->assertTrue(is_file($root . '/modules/allpest/allpest.php'));
         $this->assertStringContainsString("'allpest'", (string)file_get_contents($root . '/assets/js/nubuilder-next.js'));
     }
+
+    public function testTreatmentWorkspaceIsAStudioModuleWithAccessCheckAndScopedStyles(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $m = (string)file_get_contents($root . '/modules/allpest_work/allpest_work.php');
+        $this->assertStringContainsString('core/module_bootstrap.php', $m);
+        $this->assertStringContainsString("'treatment.record'", $m);
+        $this->assertStringContainsString("'allpest_work'", (string)file_get_contents($root . '/assets/js/nubuilder-next.js'));
+        foreach (preg_split('/}/', (string)file_get_contents($root . '/assets/css/allpest-studio.css')) as $rule) {
+            $sel = trim((string)strstr($rule, '{', true));
+            if ($sel === '' || str_starts_with($sel, '/*') || str_starts_with($sel, '.ap-toast')) { continue; }
+            $this->assertStringStartsWith('.ap-scope', $sel, 'unscoped rule: ' . $sel);
+        }
+    }
+
+    private function dbWithRequest(?string $containerList): array
+    {
+        $db = new ApTestDb();
+        ApSchema::ensure($db);
+        ApDb::set($db);
+        $id = ApId::uuid();
+        $db->insert('ap_requests', ['id' => $id, 'reference' => 'AP-W-' . substr($id, 0, 5), 'customer_name' => 'X', 'customer_email' => 'x@example.com', 'container_list' => $containerList]);
+        return [$db, $id];
+    }
+
+    public function testContainerListFromThePublicFormBecomesConsignmentsExactlyOnce(): void
+    {
+        [$db, $id] = $this->dbWithRequest("MSKU1234567, SEAL9, Timber, Auckland, Lautoka, 40 ft\n\n  TGHU7654321 ; ; Logs\n");
+        $this->assertSame(1, ApRequests::importContainerLists());
+        $rows = $db->fetchAll('SELECT container_no, seal_no, commodity, origin, destination, quantity FROM ap_consignments WHERE request_id = ? ORDER BY container_no', [$id]);
+        $this->assertCount(2, $rows);
+        $this->assertSame(['MSKU1234567', 'SEAL9', 'Timber', 'Auckland', 'Lautoka', '40 ft'], array_values($rows[0]));
+        $this->assertSame('TGHU7654321', $rows[1]['container_no']);
+        $this->assertSame(0, ApRequests::importContainerLists());                 // already imported: nothing more
+        $this->assertSame(2, (int)$db->fetchOne('SELECT COUNT(*) AS n FROM ap_consignments')['n']);
+    }
+
+    public function testRequestsWithoutAContainerListAreLeftAlone(): void
+    {
+        [$db] = $this->dbWithRequest('   ');
+        $this->assertSame(0, ApRequests::importContainerLists());
+        $this->assertSame(0, (int)$db->fetchOne('SELECT COUNT(*) AS n FROM ap_consignments')['n']);
+    }
 }

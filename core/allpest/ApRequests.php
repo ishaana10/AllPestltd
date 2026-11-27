@@ -113,11 +113,47 @@ final class ApRequests
      */
     public static function confirm(string $requestId, array $plan, string $adminId): void
     {
+        self::importContainerLists($requestId);
         $set = [];
         foreach (['site_lat', 'site_lng'] as $k) {
             if (isset($plan[$k]) && is_numeric($plan[$k])) { $set[$k] = (float)$plan[$k]; }
         }
         self::advance($requestId, 'confirmed', $set + ['notes' => trim((string)($plan['notes'] ?? '')) ?: null]);
+    }
+
+    /**
+     * Requests that arrive through the studio's public form carry their containers as text (one per line:
+     * container no, seal no, commodity, origin, destination, quantity). Turn that into consignment rows, once.
+     * @return int requests imported
+     */
+    public static function importContainerLists(?string $onlyRequestId = null): int
+    {
+        $db = ApDb::get();
+        $sql = "SELECT id, container_list FROM ap_requests WHERE container_list IS NOT NULL AND TRIM(container_list) <> '' AND NOT EXISTS (SELECT 1 FROM ap_consignments c WHERE c.request_id = ap_requests.id)";
+        $params = [];
+        if ($onlyRequestId !== null) { $sql .= ' AND id = ?'; $params[] = $onlyRequestId; }
+        $n = 0;
+        foreach ($db->fetchAll($sql, $params) as $r) {
+            $lines = array_values(array_filter(array_map('trim', preg_split('/\R/', (string)$r['container_list'])), fn ($l) => $l !== ''));
+            $lines = array_slice($lines, 0, self::MAX_CONSIGNMENTS);
+            $db->beginTransaction();
+            try {
+                foreach ($lines as $line) {
+                    $p = array_map('trim', preg_split('/[,\t;]/', $line));
+                    $db->insert('ap_consignments', [
+                        'id' => ApId::uuid(), 'request_id' => $r['id'], 'container_no' => self::clip($p[0] ?? '', 30), 'seal_no' => self::clip($p[1] ?? '', 40),
+                        'commodity' => self::clip($p[2] ?? '', 200), 'origin' => self::clip($p[3] ?? '', 100), 'destination' => self::clip($p[4] ?? '', 100),
+                        'quantity' => self::clip($p[5] ?? '', 80), 'created_at' => gmdate('Y-m-d H:i:s'),
+                    ]);
+                }
+                $db->commit();
+                $n++;
+            } catch (Throwable $e) {
+                $db->rollback();
+                error_log('[allpest container import] ' . $e->getMessage());
+            }
+        }
+        return $n;
     }
 
     /** Move one step along new -> confirmed -> scheduled -> in_progress -> completed; anything else throws. */

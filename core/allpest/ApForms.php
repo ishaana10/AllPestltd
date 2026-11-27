@@ -49,9 +49,22 @@ final class ApForms
                     self::row(self::dt('requested_date', 'Requested date', 'date'), self::sel('status', 'Status', ['new' => 'New', 'confirmed' => 'Confirmed', 'scheduled' => 'Scheduled', 'in_progress' => 'In progress', 'completed' => 'Completed', 'cancelled' => 'Cancelled'], 6, ['default_value' => 'new'])),
                     self::row(['name' => 'reference', 'label' => 'Reference', 'type' => 'autonumber', 'col' => 6, 'sequence_code' => 'ap_staff_request_ref', 'prefix_pattern' => 'AP-S-', 'suffix_pattern' => '', 'padding_length' => 5], self::t('job_type', 'Job type', 6, ['default_value' => 'fumigation', 'readonly' => true])),
                     self::row(self::area('notes', 'Notes')),
+                    self::row(self::area('container_list', 'Containers as submitted on the public form (imported into the grid below once)', 12, ['readonly' => true])),
                     ['type' => 'subform', 'name' => 'consignments', 'label' => 'Containers / consignments', 'col' => 12, 'subform' => ['form_code' => 'ap_consignments', 'fk_field' => 'request_id', 'view' => 'grid']],
                 ],
                 'browse' => [self::col('reference', 'Reference', '140px'), self::col('customer_name', 'Customer', '200px'), self::col('status', 'Status', '120px', 'badge', 'center'), self::col('requested_date', 'Requested', '120px'), self::col('site_address', 'Site', '240px')]],
+            'ap_public_request' => ['table' => 'ap_requests', 'name' => 'Request a Fumigation (public form)', 'description' => 'The form customers fill in through the public link. Its fields are the same table as Fumigation Requests.', 'roles' => self::ADMIN, 'readonly' => false, 'order' => 0, 'type' => 'public',
+                'layout' => [
+                    self::row(self::req(self::t('customer_name', 'Your name / company')), self::req(['name' => 'customer_email', 'label' => 'Email', 'type' => 'email', 'col' => 6])),
+                    self::row(self::t('customer_phone', 'Phone'), self::t('customer_tin', 'TIN (for the invoice)')),
+                    self::row(self::area('customer_address', 'Billing address')),
+                    self::row(self::req(self::area('site_address', 'Where is the fumigation to take place?'))),
+                    self::row(self::dt('requested_date', 'Preferred date', 'date')),
+                    self::row(self::req(self::area('container_list', 'Containers (one per line: container no, seal no, commodity, origin, destination, quantity)', 12, ['rows' => 6, 'help' => 'Example: MSKU1234567, SL12345, Timber, Auckland, Lautoka, 1 x 40ft']))),
+                    self::row(self::area('notes', 'Anything else we should know')),
+                    self::row(['name' => 'reference', 'label' => 'Reference', 'type' => 'autonumber', 'col' => 6, 'sequence_code' => 'ap_public_request_ref', 'prefix_pattern' => 'AP-W-', 'suffix_pattern' => '', 'padding_length' => 5]),
+                ],
+                'browse' => [self::col('reference', 'Reference', '140px'), self::col('customer_name', 'Customer', '200px'), self::col('requested_date', 'Requested', '120px')]],
             'ap_consignments' => ['table' => 'ap_consignments', 'name' => 'Containers', 'description' => 'One row per container or consignment on a request.', 'roles' => self::ADMIN, 'readonly' => false, 'order' => 0, 'type' => 'subform',
                 'layout' => [
                     self::row(self::t('container_no', 'Container no.', 4), self::t('seal_no', 'Seal no.', 4), self::t('quantity', 'Quantity', 4)),
@@ -130,14 +143,44 @@ final class ApForms
         foreach (self::definitions() as $code => $d) {
             if ($db->fetchOne('SELECT form_id FROM nu_forms WHERE form_code = ? AND project_id = ?', [$code, $projectId])) { continue; }
             $db->insert('nu_forms', [
-                'project_id' => $projectId, 'form_code' => $code, 'form_type' => $d['type'] ?? 'main', 'form_name' => $d['name'], 'form_table' => $d['table'], 'form_description' => $d['description'],
+                'project_id' => $projectId, 'form_code' => $code, 'form_type' => in_array($d['type'] ?? 'main', ['subform'], true) ? 'subform' : 'main', 'form_name' => $d['name'], 'form_table' => $d['table'], 'form_description' => $d['description'],
                 'form_layout' => json_encode($d['layout']), 'browse_layout' => json_encode($d['browse']), 'form_active' => 1, 'form_pk_type' => 'uuid', 'form_table_mode' => 'existing',
                 'browse_delete_enabled' => $d['readonly'] ? 0 : 1,
-            ]);
+            ] + ($code === 'ap_requests' ? ['form_custom_php' => self::importHook()] : []));
             $created[] = $code;
         }
         self::provisionMenu($db, $projectId);
         return $created;
+    }
+
+    /** Sidebar entries that open a studio module rather than a form: target => [label, order, roles]. */
+    public static function moduleEntries(): array
+    {
+        return ['allpest_work' => ['Treatment Workspace', 5, self::FIELD], 'allpest_board' => ['Request Board', 6, self::ADMIN], 'allpest_stock' => ['Stock', 7, self::ADMIN], 'allpest_settings' => ['Settings', 90, self::ADMIN]];
+    }
+
+    /** PHP run when the staff request form is opened: bring in the containers of any new public requests first. */
+    private static function importHook(): string
+    {
+        $file = var_export(__DIR__ . '/ApRequests.php', true);
+        return "try { require_once $file; ApRequests::importContainerLists(); } catch (Throwable \$e) { error_log('[allpest import] ' . \$e->getMessage()); }";
+    }
+
+    /** Create the public link (once) for the public request form. @return string|null the share token */
+    public static function provisionPublicShare(object $db, int $projectId = 1, ?string $userId = null, string $notifyEmail = ''): ?string
+    {
+        $row = $db->fetchOne('SELECT fs_token FROM nu_form_shares WHERE project_id = ? AND fs_form_code = ?', [$projectId, 'ap_public_request']);
+        if ($row) { return (string)$row['fs_token']; }
+        $token = bin2hex(random_bytes(16));
+        $fields = ['customer_name', 'customer_email', 'customer_phone', 'customer_tin', 'customer_address', 'site_address', 'requested_date', 'container_list', 'notes'];
+        $db->insert('nu_form_shares', [
+            'project_id' => $projectId, 'fs_form_code' => 'ap_public_request', 'fs_token' => $token, 'fs_secret' => bin2hex(random_bytes(24)), 'fs_enabled' => 1,
+            'fs_title' => 'Request a fumigation', 'fs_intro' => 'Tell us where and what to treat. We will confirm the booking by email.', 'fs_submit_label' => 'Send request',
+            'fs_success_message' => 'Thank you. Your request has been received and our team will be in touch to confirm.', 'fs_notify_email' => $notifyEmail !== '' ? $notifyEmail : null,
+            'fs_confirm_email' => 1, 'fs_email_field' => 'customer_email', 'fs_confirm_message' => 'We have your fumigation request and will confirm the booking shortly.',
+            'fs_fields' => json_encode($fields), 'fs_created_by' => $userId,
+        ]);
+        return $token;
     }
 
     private static function provisionMenu(object $db, int $projectId): void
@@ -156,10 +199,16 @@ final class ApForms
             if (!$groupId) { $groupId = (int)$db->fetchOne("SELECT menu_id FROM nu_menus WHERE menu_label = ? AND menu_type = 'group' AND project_id = ?", [self::GROUP_LABEL, $projectId])['menu_id']; }
         }
         foreach (self::definitions() as $code => $d) {
-            if (($d['type'] ?? 'main') === 'subform') { continue; }
+            if (in_array($d['type'] ?? 'main', ['subform', 'public'], true)) { continue; }
             if ($db->fetchOne('SELECT menu_id FROM nu_menus WHERE menu_target = ? AND project_id = ?', [$code, $projectId])) { continue; }
             $db->insert('nu_menus', ['menu_label' => $d['name'], 'menu_type' => 'form', 'menu_target' => $code, 'menu_parent_id' => $groupId, 'menu_order' => $d['order'], 'menu_roles' => $d['roles'],
                 'menu_role_access' => json_encode(explode(',', $d['roles'])), 'menu_active' => 1, 'menu_icon' => 'form', 'menu_open_mode' => 'inline|browse', 'menu_browse_mode' => 'inline',
+                'menu_preview_mode' => 'inline', 'menu_default_view' => 'browse', 'project_id' => $projectId]);
+        }
+        foreach (self::moduleEntries() as $target => [$label, $order, $roles]) {
+            if ($db->fetchOne('SELECT menu_id FROM nu_menus WHERE menu_target = ? AND project_id = ?', [$target, $projectId])) { continue; }
+            $db->insert('nu_menus', ['menu_label' => $label, 'menu_type' => 'module', 'menu_target' => $target, 'menu_parent_id' => $groupId, 'menu_order' => $order, 'menu_roles' => $roles,
+                'menu_role_access' => json_encode(explode(',', $roles)), 'menu_active' => 1, 'menu_icon' => 'clipboard', 'menu_open_mode' => 'inline|browse', 'menu_browse_mode' => 'inline',
                 'menu_preview_mode' => 'inline', 'menu_default_view' => 'browse', 'project_id' => $projectId]);
         }
     }

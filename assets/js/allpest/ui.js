@@ -1,7 +1,7 @@
 /* Small helpers shared by the All Pest screens. No framework; every value is escaped before it reaches the DOM. */
 window.ApUi = (function () {
   'use strict';
-  var API = '../../api/allpest/';
+  var API = window.AP_API || '../../api/allpest/';
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function parse(r) { return r.text().then(function (t) { var j = null; try { j = JSON.parse(t); } catch (e) {} if (!r.ok) { throw new Error((j && j.error) || ('Request failed (' + r.status + ')')); } return j; }); }
   function get(file, params) { var q = params ? '?' + new URLSearchParams(params).toString() : ''; return fetch(API + file + q, { credentials: 'same-origin' }).then(parse); }
@@ -10,7 +10,7 @@ window.ApUi = (function () {
     Object.keys(obj || {}).forEach(function (k) { var v = obj[k]; if (Array.isArray(v)) { v.forEach(function (x) { f.append(k + '[]', x); }); } else if (v !== undefined && v !== null) { f.append(k, v); } });
     return fetch(API + file, { method: 'POST', body: f, credentials: 'same-origin' }).then(parse);
   }
-  function toast(msg, bad) { var t = document.getElementById('apToast'); t.textContent = msg; t.className = 'ap-toast show' + (bad ? ' bad' : ''); clearTimeout(toast._t); toast._t = setTimeout(function () { t.className = 'ap-toast'; }, bad ? 7000 : 3000); }
+  function toast(msg, bad) { var t = document.getElementById('apToast'); if (!t) { t = document.createElement('div'); t.id = 'apToast'; t.setAttribute('role', 'status'); document.body.appendChild(t); } t.textContent = msg; t.className = 'ap-toast show' + (bad ? ' bad' : ''); clearTimeout(toast._t); toast._t = setTimeout(function () { t.className = 'ap-toast'; }, bad ? 7000 : 3000); }
   function fail(e) { toast(e && e.message ? e.message : String(e), true); }
   function table(el, rows, cols) {
     if (!rows || !rows.length) { el.innerHTML = '<p class="ap-muted">Nothing here yet.</p>'; return; }
@@ -38,6 +38,11 @@ window.ApUi = (function () {
   }
   function nowIso() { var d = new Date(), p = function (n) { return ('0' + n).slice(-2); }, o = -d.getTimezoneOffset(), a = Math.abs(o); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()) + (o >= 0 ? '+' : '-') + p(Math.floor(a / 60)) + ':' + p(a % 60); }
   function fiji(utc) { if (!utc) return ''; var d = new Date(String(utc).replace(' ', 'T') + 'Z'); if (isNaN(d)) return esc(utc); return d.toLocaleString('en-GB', { timeZone: 'Pacific/Fiji', dateStyle: 'medium', timeStyle: 'short' }); }
-  function qs(k) { return new URLSearchParams(location.search).get(k); }
-  return { esc: esc, get: get, post: post, toast: toast, fail: fail, table: table, form: form, nowIso: nowIso, fiji: fiji, qs: qs };
+  function qs(k) { if (window.AP_PARAMS && k in window.AP_PARAMS) { return window.AP_PARAMS[k]; } return window.AP_PARAMS ? null : new URLSearchParams(location.search).get(k); }
+  /** Open a treatment: inside the studio shell, reload the workspace module for it; as a standalone page, follow the link. */
+  function open(id, page) {
+    if (window.AP_PARAMS && window.NuApp && NuApp.loadModule) { window.AP_NEXT = id || null; NuApp.loadModule('allpest_work'); return; }
+    location.href = (page || 'treatment.php') + (id ? '?id=' + encodeURIComponent(id) : '');
+  }
+  return { esc: esc, get: get, post: post, toast: toast, fail: fail, table: table, form: form, nowIso: nowIso, fiji: fiji, qs: qs, open: open };
 })();
