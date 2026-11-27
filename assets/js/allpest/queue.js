@@ -20,7 +20,7 @@ window.ApQueue = (function () {
       if (item.file_ids && item.file_ids[i]) return Promise.resolve(item.file_ids[i]);
       return ApCompress.fromDataUrl(d).then(function (b) {
         var f = new FormData(); f.append('purpose', 'reading_photo'); f.append('file', b, 'reading.jpg');
-        return fetch('../../api/allpest/upload.php', { method: 'POST', body: f, credentials: 'same-origin' }).then(function (r) { return r.json().then(function (j) { if (!r.ok) { var e = new Error(j.error || 'Upload failed'); e.fatal = r.status >= 400 && r.status < 500 && r.status !== 401 && r.status !== 429; throw e; } return j.file_id; }); });
+        return fetch((window.AP_API || '../../api/allpest/') + 'upload.php', { method: 'POST', body: f, credentials: 'same-origin' }).then(function (r) { return r.json().then(function (j) { if (!r.ok) { var e = new Error(j.error || 'Upload failed'); e.fatal = r.status >= 400 && r.status < 500 && r.status !== 401 && r.status !== 429; throw e; } return j.file_id; }); });
       });
     });
     return Promise.all(up).then(function (ids) {
@@ -29,7 +29,7 @@ window.ApQueue = (function () {
       f.append('action', 'readings'); f.append('treatment_id', item.treatment_id); f.append('client_uuid', item.client_uuid); f.append('stage', item.stage);
       f.append('at', item.at); f.append('values', JSON.stringify(item.values)); f.append('initials', item.initials);
       ids.forEach(function (id) { f.append('file_ids[]', id); });
-      return fetch('../../api/allpest/treatments.php', { method: 'POST', body: f, credentials: 'same-origin' }).then(function (r) {
+      return fetch((window.AP_API || '../../api/allpest/') + 'treatments.php', { method: 'POST', body: f, credentials: 'same-origin' }).then(function (r) {
         return r.json().then(function (j) { if (!r.ok) { var e = new Error(j.error || 'Rejected'); e.fatal = r.status >= 400 && r.status < 500 && r.status !== 401 && r.status !== 429; e.status = r.status; throw e; } return j; });
       });
     });

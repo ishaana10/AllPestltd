@@ -161,6 +161,18 @@ final class ApRof
         ];
     }
 
+    /** document() plus the signature image paths the PDF needs (server paths: never sent to the browser). */
+    public static function pdfData(string $treatmentId): array
+    {
+        $d = self::document($treatmentId);
+        $assets = [];
+        foreach (ApDb::get()->fetchAll('SELECT role, image_file_id FROM ap_signatures WHERE treatment_id = ? AND image_file_id IS NOT NULL ORDER BY signed_at', [$treatmentId]) as $r) {
+            if (class_exists('ApUploads')) { $assets[(string)$r['role']] = ApUploads::path((string)$r['image_file_id']); }
+        }
+        $d['_assets'] = $assets;
+        return $d;
+    }
+
     private static function number(mixed $v, string $label, float $min, float $max): ?float
     {
         if ($v === null || trim((string)$v) === '') { return null; }

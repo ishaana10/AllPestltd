@@ -13,6 +13,18 @@ ApAccess::guard('admin.certificates');
 $adminVerify = ApSettings::get('certificate_admin_verify', '0') === '1';
 
 try {
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['pdf'])) {
+        $cid = (string)($_GET['container_id'] ?? '');
+        $c = $db->fetchOne('SELECT number, content_sha256 FROM ap_certificates WHERE container_id = ?', [$cid]);
+        if (!$c) { http_response_code(404); header('Content-Type: application/json'); echo json_encode(['error' => 'No certificate has been issued for this container.']); exit; }
+        if (ApCertificates::recomputeHash($cid) !== (string)$c['content_sha256']) {
+            http_response_code(409); header('Content-Type: application/json'); echo json_encode(['error' => 'Certificate ' . $c['number'] . ' no longer matches the content issued.']); exit;
+        }
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="Certificate-' . preg_replace('/[^A-Za-z0-9_-]/', '', (string)$c['number']) . '.pdf"');
+        echo ApCertificateRenderer::render(ApCertificates::data($cid));
+        exit;
+    }
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $rows = $db->fetchAll('SELECT tc.id, tc.result, tc.tlv_ppm, tc.verified_at, c.container_no, ce.number, ce.emailed_at, ce.email_pending FROM ap_treatment_containers tc
             JOIN ap_consignments c ON c.id = tc.consignment_id LEFT JOIN ap_certificates ce ON ce.container_id = tc.id WHERE tc.treatment_id = ? ORDER BY c.container_no', [(string)($_GET['treatment_id'] ?? '')]);

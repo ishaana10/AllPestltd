@@ -5,7 +5,7 @@ use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/support/ApTestDb.php';
 foreach (['ApId', 'ApSchema', 'ApDb', 'ApSettings', 'ApUploads', 'ApRequests', 'ApTechnicians', 'ApEquipment', 'ApSchedules', 'ApStock',
-          'ApStandards', 'ApDose', 'ApReadings', 'ApTemperature', 'ApResult', 'ApTreatments', 'ApRof'] as $c) {
+          'ApStandards', 'ApDose', 'ApReadings', 'ApTemperature', 'ApResult', 'ApTreatments', 'ApRof', 'ApRofRenderer'] as $c) {
     require_once dirname(__DIR__, 3) . "/core/allpest/$c.php";
 }
 
@@ -155,5 +155,19 @@ final class ApRofTest extends TestCase
         $this->assertStringContainsString('window.AP_ROF_NEXT', $rof);
         $this->assertStringContainsString("NuApp.loadModule('allpest_rof')", $work);
         $this->assertStringContainsString('window.AP_ROF_NEXT = openId', $work);
+    }
+
+    public function testBothVariantsRenderAsPdf(): void
+    {
+        ApRof::saveDetails($this->tid, ['suitable' => '1', 'target_of_fumigation' => 'commodity', 'loc_street' => '1 Wharf Rd']);
+        ApRof::saveDetails($this->ptid, ['load_factor_max' => '80', 'load_factor_est' => '60', 'probe_location' => 'pulp']);
+        ApRof::temperatures($this->ptid, new DateTimeImmutable('2026-11-20 08:00:00', new DateTimeZone('UTC')), [1 => '22.5'], 'AB');
+        foreach ([$this->tid, $this->ptid] as $id) {
+            $pdf = ApRofRenderer::render(ApRof::pdfData($id));
+            $this->assertStringStartsWith('%PDF', $pdf);
+            $this->assertTrue(strlen($pdf) > 2000);
+        }
+        $this->assertTrue(array_key_exists('_assets', ApRof::pdfData($this->tid)));
+        $this->assertTrue(!array_key_exists('_assets', ApRof::document($this->tid)), 'server paths never go in the JSON record');
     }
 }

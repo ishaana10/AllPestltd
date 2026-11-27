@@ -1,10 +1,12 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/ApSettings.php';
+
 /**
  * Provisions the All Pest screens as ordinary StudioX forms (nu_forms) and sidebar entries (nu_menus), so they are built, edited,
- * permissioned and audited by the studio itself. Idempotent: existing forms are never overwritten (so edits made in the Forms builder
- * survive), only missing ones are created. Forms over tables whose rules live in the All Pest engine (treatments, certificates,
+ * permissioned and audited by the studio itself. Idempotent: missing forms are created, and a form still carrying the layout this app last wrote is
+ * refreshed; one edited in the Forms builder is left alone. Forms over tables whose rules live in the All Pest engine (treatments, certificates,
  * invoices, stock movements) are read-only: changes to them go through the engine so the checks and the audit trail stay intact.
  */
 final class ApForms
@@ -46,7 +48,7 @@ final class ApForms
                     self::row(self::t('customer_phone', 'Phone'), self::t('customer_tin', 'TIN')),
                     self::row(self::area('customer_address', 'Customer address')),
                     self::row(self::area('site_address', 'Site address (where the treatment is done)')),
-                    self::row(self::dt('requested_date', 'Requested date', 'date'), self::sel('status', 'Status', ['new' => 'New', 'confirmed' => 'Confirmed', 'scheduled' => 'Scheduled', 'in_progress' => 'In progress', 'completed' => 'Completed', 'cancelled' => 'Cancelled'], 6, ['default_value' => 'new'])),
+                    self::row(self::dt('requested_date', 'Requested date', 'date'), self::ro(self::sel('status', 'Status (changed from the Request Board)', ['new' => 'New', 'confirmed' => 'Confirmed', 'scheduled' => 'Scheduled', 'in_progress' => 'In progress', 'completed' => 'Completed', 'cancelled' => 'Cancelled'], 6, ['default_value' => 'new']))),
                     self::row(['name' => 'reference', 'label' => 'Reference', 'type' => 'autonumber', 'col' => 6, 'sequence_code' => 'ap_staff_request_ref', 'prefix_pattern' => 'AP-S-', 'suffix_pattern' => '', 'padding_length' => 5], self::t('job_type', 'Job type', 6, ['default_value' => 'fumigation', 'readonly' => true])),
                     self::row(self::area('notes', 'Notes')),
                     self::row(self::area('container_list', 'Containers as submitted on the public form (imported into the grid below once)', 12, ['readonly' => true])),
@@ -71,7 +73,7 @@ final class ApForms
                     self::row(self::t('commodity', 'Commodity', 4), self::t('origin', 'Origin', 4), self::t('destination', 'Destination', 4)),
                 ],
                 'browse' => [self::col('container_no', 'Container', '140px'), self::col('seal_no', 'Seal', '120px'), self::col('commodity', 'Commodity', '180px'), self::col('origin', 'Origin', '120px'), self::col('destination', 'Destination', '140px')]],
-            'ap_treatments' => ['table' => 'ap_treatments', 'name' => 'Treatments (ROF)', 'description' => 'Records of fumigation. Dose, readings, signing and closing are done through the treatment actions so the rules are enforced.', 'roles' => self::FIELD, 'readonly' => true, 'order' => 20,
+            'ap_treatments' => ['table' => 'ap_treatments', 'name' => 'Treatments (ROF)', 'description' => 'Records of fumigation. Dose, readings, signing and closing are done through the treatment actions so the rules are enforced.', 'roles' => self::ADMIN, 'readonly' => true, 'order' => 20,
                 'layout' => [
                     self::row(self::ro(self::t('status', 'Status')), self::ro(self::t('rof_type', 'ROF type'))),
                     self::row(self::ro(self::lookup('technician_id', 'Fumigator in charge', 'ap_technicians', 'id', 'full_name')), self::ro(self::lookup('officer_id', 'Supervising officer', 'ap_officers', 'id', 'full_name'))),
@@ -136,12 +138,28 @@ final class ApForms
         ];
     }
 
-    /** Create any missing All Pest forms and menu entries. @return string[] the form codes created this run */
+    /**
+     * Create any missing All Pest forms and menu entries; bring forms the builder has not touched up to the current layout.
+     * A form whose layout still matches the one this app last wrote (kept as a hash in the settings) is refreshed; one that was
+     * edited in the builder is left alone. @return string[] the form codes created this run
+     */
     public static function provision(object $db, int $projectId = 1, ?int $userId = null): array
     {
         $created = [];
         foreach (self::definitions() as $code => $d) {
-            if ($db->fetchOne('SELECT form_id FROM nu_forms WHERE form_code = ? AND project_id = ?', [$code, $projectId])) { continue; }
+            $have = $db->fetchOne('SELECT form_id, form_layout, browse_layout FROM nu_forms WHERE form_code = ? AND project_id = ?', [$code, $projectId]);
+            if ($have) {
+                $new = json_encode($d['layout']) . '|' . json_encode($d['browse']);
+                $key = 'forms.layout_hash.' . $code;
+                $stored = (string)ApSettings::get($key, '');
+                $now = md5((string)$have['form_layout'] . '|' . (string)$have['browse_layout']);
+                if (($stored === '' || $stored === $now) && $now !== md5($new)) {
+                    $db->update('nu_forms', ['form_layout' => json_encode($d['layout']), 'browse_layout' => json_encode($d['browse'])], 'form_id = ?', [$have['form_id']]);
+                }
+                if ($stored === $now || $stored === '' || $now === md5($new)) { ApSettings::set($key, md5($new)); }
+                continue;
+            }
+            ApSettings::set('forms.layout_hash.' . $code, md5(json_encode($d['layout']) . '|' . json_encode($d['browse'])));
             $db->insert('nu_forms', [
                 'project_id' => $projectId, 'form_code' => $code, 'form_type' => in_array($d['type'] ?? 'main', ['subform'], true) ? 'subform' : 'main', 'form_name' => $d['name'], 'form_table' => $d['table'], 'form_description' => $d['description'],
                 'form_layout' => json_encode($d['layout']), 'browse_layout' => json_encode($d['browse']), 'form_active' => 1, 'form_pk_type' => 'uuid', 'form_table_mode' => 'existing',
@@ -178,7 +196,7 @@ final class ApForms
             'fs_title' => 'Request a fumigation', 'fs_intro' => 'Tell us where and what to treat. We will confirm the booking by email.', 'fs_submit_label' => 'Send request',
             'fs_success_message' => 'Thank you. Your request has been received and our team will be in touch to confirm.', 'fs_notify_email' => $notifyEmail !== '' ? $notifyEmail : null,
             'fs_confirm_email' => 1, 'fs_email_field' => 'customer_email', 'fs_confirm_message' => 'We have your fumigation request and will confirm the booking shortly.',
-            'fs_fields' => json_encode($fields), 'fs_created_by' => $userId,
+            'fs_fields' => json_encode($fields), 'fs_created_by' => $userId !== null && $userId !== '' ? substr($userId, 0, 32) : null,
         ]);
         return $token;
     }
@@ -198,6 +216,8 @@ final class ApForms
             $groupId = (int)$db->insert('nu_menus', $base + ['menu_label' => self::GROUP_LABEL, 'menu_target' => '', 'menu_parent_id' => 0, 'menu_order' => 20, 'menu_roles' => self::FIELD, 'menu_role_access' => json_encode(explode(',', self::FIELD))]);
             if (!$groupId) { $groupId = (int)$db->fetchOne("SELECT menu_id FROM nu_menus WHERE menu_label = ? AND menu_type = 'group' AND project_id = ?", [self::GROUP_LABEL, $projectId])['menu_id']; }
         }
+        // The first releases showed 'Treatments (ROF)' to technicians, but the studio form refuses them: they use the Record of Fumigation page.
+        $db->update('nu_menus', ['menu_roles' => self::ADMIN, 'menu_role_access' => json_encode(explode(',', self::ADMIN))], "menu_target = 'ap_treatments' AND project_id = ? AND menu_roles = ?", [$projectId, self::FIELD]);
         foreach (self::definitions() as $code => $d) {
             if (in_array($d['type'] ?? 'main', ['subform', 'public'], true)) { continue; }
             if ($db->fetchOne('SELECT menu_id FROM nu_menus WHERE menu_target = ? AND project_id = ?', [$code, $projectId])) { continue; }

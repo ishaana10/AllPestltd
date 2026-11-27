@@ -6,6 +6,12 @@ require_once dirname(__DIR__, 2) . '/lib/tcpdf/tcpdf.php';
 /** Renders a certificate's canonical data (see ApCertificates::data) as a PDF string. Certificates are never stored as files. */
 final class ApCertificateRenderer
 {
+    /** 2026-11-27 18:51 -> 27/11/2026 (display only; the stored data and its hash are unchanged). */
+    private static function dmy(string $v): string
+    {
+        return preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $v, $m) ? "$m[3]/$m[2]/$m[1]" : $v;
+    }
+
     public static function render(array $d): string
     {
         $e = fn ($v): string => htmlspecialchars((string)$v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -22,7 +28,7 @@ final class ApCertificateRenderer
         $pp = $d['place_parts'] ?? [];
         $html = '<h2 style="text-align:center">' . $e($d['provider']['name'] ?? '') . '</h2>'
             . '<p style="text-align:center">' . nl2br($e($d['provider']['address'] ?? '')) . '</p>'
-            . '<p>Date issued (dd/mm/yyyy): <b>' . $e($d['issued_at'] ?? '') . '</b></p>'
+            . '<p>Date issued (dd/mm/yyyy): <b>' . $e(self::dmy($d['issued_at'] ?? '')) . '</b></p>'
             . '<h3 style="text-align:center">Treatment certificate – Methyl bromide fumigation</h3>'
             . '<table border="1" cellpadding="4">' . $row('Certificate number', $d['number'] ?? '') . $row('Treatment provider ID number', $d['provider']['provider_id'] ?? '') . $row('Job reference', $d['request_reference'] ?? '') . '</table>'
             . $sec('Consignment details') . '<table border="1" cellpadding="4">'
@@ -45,7 +51,7 @@ final class ApCertificateRenderer
         $sig = $d['signatures']['fumigator'] ?? [];
         $img = $d['_assets']['fumigator_png'] ?? null;
         $html .= '<table border="1" cellpadding="4"><tr><td width="34%" style="background-color:#eef2ee"><b>Signature</b></td><td width="66%">' . ($img && is_file($img) ? '<img src="' . $e($img) . '" height="40"/>' : '<br/><br/>') . '</td></tr>'
-            . $row('Full name', $sig['name'] ?? '') . $row('Date (dd/mm/yyyy)', $sig['signed_at'] ?? '') . $row('Accreditation number', $d['accreditation_no'] ?? '') . '</table>';
+            . $row('Full name', $sig['name'] ?? '') . $row('Date (dd/mm/yyyy)', self::dmy($sig['signed_at'] ?? '')) . $row('Accreditation number', $d['accreditation_no'] ?? '') . '</table>';
         $osig = $d['signatures']['officer'] ?? [];
         if ($osig) {
             $oimg = $d['_assets']['officer_png'] ?? null;

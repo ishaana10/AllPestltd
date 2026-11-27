@@ -22,6 +22,17 @@ window.ApCompress = (function () {
   function toDataUrl(blob) {
     return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(r.result); }; r.onerror = rej; r.readAsDataURL(blob); });
   }
-  function fromDataUrl(d) { return fetch(d).then(function (r) { return r.blob(); }); }
+  // Decoded by hand: the studio's security policy does not allow fetch() of data: URLs.
+  function fromDataUrl(d) {
+    return new Promise(function (resolve, reject) {
+      try {
+        var m = /^data:([^;,]*)(;base64)?,(.*)$/.exec(d);
+        if (!m) { throw new Error('Bad photo data.'); }
+        var raw = m[2] ? atob(m[3]) : decodeURIComponent(m[3]), bytes = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; i++) { bytes[i] = raw.charCodeAt(i); }
+        resolve(new Blob([bytes], { type: m[1] || 'application/octet-stream' }));
+      } catch (e) { reject(e); }
+    });
+  }
   return { image: image, toDataUrl: toDataUrl, fromDataUrl: fromDataUrl, MAX: MAX, QUALITY: QUALITY };
 })();

@@ -4,7 +4,7 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/support/ApTestDb.php';
-foreach (['ApId', 'ApSchema', 'ApDb', 'ApForms'] as $c) { require_once dirname(__DIR__, 3) . "/core/allpest/$c.php"; }
+foreach (['ApId', 'ApSchema', 'ApDb', 'ApSettings', 'ApForms'] as $c) { require_once dirname(__DIR__, 3) . "/core/allpest/$c.php"; }
 
 final class ApFormsTest extends TestCase
 {
@@ -62,6 +62,30 @@ final class ApFormsTest extends TestCase
         $this->assertSame('uuid', $f['form_pk_type']);
         $this->assertSame('existing', $f['form_table_mode']);
         $this->assertTrue(is_array(json_decode($f["form_layout"], true)));
+    }
+
+    public function testProvisionRefreshesUntouchedFormsButNotOnesEditedInTheBuilder(): void
+    {
+        ApForms::provision($this->db, 1);
+        // an older release's layout, never edited: brought up to date
+        $this->db->exec("UPDATE nu_forms SET form_layout = '[]' WHERE form_code = 'ap_equipment'");
+        ApSettings::set('forms.layout_hash.ap_equipment', md5("[]|" . $this->db->fetchOne("SELECT browse_layout b FROM nu_forms WHERE form_code = 'ap_equipment'")['b']));
+        ApForms::provision($this->db, 1);
+        $this->assertNotSame('[]', $this->db->fetchOne("SELECT form_layout l FROM nu_forms WHERE form_code = 'ap_equipment'")['l']);
+        // edited in the builder after we wrote it: left alone
+        $this->db->exec("UPDATE nu_forms SET form_layout = '[\"mine\"]' WHERE form_code = 'ap_equipment'");
+        ApForms::provision($this->db, 1);
+        $this->assertSame('["mine"]', $this->db->fetchOne("SELECT form_layout l FROM nu_forms WHERE form_code = 'ap_equipment'")['l']);
+    }
+
+    public function testTechniciansAreNotOfferedFormsTheStudioWouldRefuseThem(): void
+    {
+        ApForms::provision($this->db, 1);
+        $this->assertSame('globeadmin,ap_admin', $this->db->fetchOne("SELECT menu_roles r FROM nu_menus WHERE menu_target = 'ap_treatments'")['r']);
+        // an install from an earlier release that still offers it to technicians is corrected
+        $this->db->exec("UPDATE nu_menus SET menu_roles = 'globeadmin,ap_admin,ap_technician' WHERE menu_target = 'ap_treatments'");
+        ApForms::provision($this->db, 1);
+        $this->assertSame('globeadmin,ap_admin', $this->db->fetchOne("SELECT menu_roles r FROM nu_menus WHERE menu_target = 'ap_treatments'")['r']);
     }
 
     public function testEngineOwnedFormsAreReadOnlyAndCannotBeDeleted(): void
@@ -140,5 +164,13 @@ final class ApFormsTest extends TestCase
         $this->assertStringContainsString('ApRequests::importContainerLists()', $php);
         $this->assertTrue(is_file(dirname(__DIR__, 3) . '/core/allpest/ApRequests.php'));
         $this->assertStringContainsString(dirname(__DIR__, 3) . '/core/allpest/ApRequests.php', $php);
+    }
+
+    public function testShareCreatorFitsTheStudioColumnForUuidUsers(): void
+    {
+        ApForms::provision($this->db, 1);
+        ApForms::provisionPublicShare($this->db, 1, '123e4567-e89b-12d3-a456-426614174000', '');
+        $by = (string)$this->db->fetchOne('SELECT fs_created_by AS c FROM nu_form_shares')['c'];
+        $this->assertTrue(strlen($by) <= 32, 'the studio column is VARCHAR(32)');
     }
 }

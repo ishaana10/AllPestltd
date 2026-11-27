@@ -182,5 +182,11 @@ final class ApEndToEndTest extends TestCase
         }
         $zip->close();
         @unlink($path);
+
+        // the request's own lifecycle is on the trail too, not just the treatment's
+        $logged = array_column($this->db->fetchAll("SELECT audit_action FROM nu_audit_log WHERE audit_table = 'ap_requests'"), 'audit_action');
+        foreach (['request.received', 'request.confirmed', 'request.scheduled'] as $a) {
+            $this->assertContains($a, $logged);
+        }
     }
 }
