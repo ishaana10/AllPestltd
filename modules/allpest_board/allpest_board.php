@@ -65,6 +65,7 @@ $e = fn ($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
       else {
         h += '<h3>Create a treatment (one record of fumigation)</h3><div id="tform">';
         h += '<label class="ap-field"><span>Containers</span>' + free.map(function (c) { return '<label style="display:block"><input type="checkbox" class="cid" value="' + esc(c.id) + '" checked> ' + esc(c.container_no) + ' · ' + esc(c.commodity) + '</label>'; }).join('') + '</label>';
+        h += '<label class="ap-field"><span>Enclosure</span><select id="t_enc"><option value="container">Un-sheeted container(s) (one ROF per container)</option><option value="container_stack">Stack of containers under sheet</option><option value="sheeted">Sheeted enclosure</option><option value="chamber">Fumigation chamber</option></select></label>';
         h += '<label class="ap-field"><span>Record type</span><select id="t_rof"><option value="general">Non-perishable</option><option value="perishable">Perishable</option></select></label>';
         h += '<label class="ap-field"><span>Fumigation type</span><select id="t_fum"><option value="ambient">Ambient</option><option value="controlled">Controlled</option></select></label>';
         h += '<label class="ap-field"><span>Scheduled start (Fiji time)</span><input id="t_start" type="datetime-local"></label>';
@@ -85,7 +86,7 @@ $e = fn ($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
     if (b) {
       b.onclick = function () {
         var ids = Array.prototype.map.call(panel.querySelectorAll('.cid:checked'), function (x) { return x.value; });
-        var data = {action: 'schedule', request_id: r.id, rof_type: rof.value, fumigation_type: document.getElementById('t_fum').value, scheduled_start: fijiToUtc(document.getElementById('t_start').value), technician_id: document.getElementById('t_tech').value, officer_id: document.getElementById('t_off').value, schedule_id: sch.value};
+        var data = {action: 'schedule', request_id: r.id, rof_type: rof.value, enclosure_type: document.getElementById('t_enc').value, fumigation_type: document.getElementById('t_fum').value, scheduled_start: fijiToUtc(document.getElementById('t_start').value), technician_id: document.getElementById('t_tech').value, officer_id: document.getElementById('t_off').value, schedule_id: sch.value};
         var p = new URLSearchParams(data); ids.forEach(function (i) { p.append('container_ids[]', i); });
         fetch(API, {method: 'POST', body: p, credentials: 'same-origin'}).then(function (x) { return x.json().then(function (j) { if (!x.ok) { throw new Error(j.error || 'Not saved'); } return j; }); })
           .then(function (j) { window.AP_ROF_NEXT = j.treatment_id; NuApp.loadModule('allpest_rof'); }).catch(function (e) { msg(e.message, true); });

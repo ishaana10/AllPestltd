@@ -44,7 +44,7 @@ final class ApTreatmentsTest extends TestCase
         ApRequests::confirm($this->reqId, [], 'a');
         $this->tid = ApRequests::createTreatment($this->reqId, $consIds, [
             'scheduled_start' => '2026-12-10 06:00:00', 'site_lat' => -17.6, 'site_lng' => 177.45, 'technician_id' => $this->tech, 'officer_id' => $officer,
-            'schedule_id' => $sched, 'rof_type' => 'general', 'enclosure_type' => 'container', 'fumigation_type' => 'ambient',
+            'schedule_id' => $sched, 'rof_type' => 'general', 'enclosure_type' => 'container_stack', 'fumigation_type' => 'ambient',
         ]);
         $this->tcs = array_column($this->db->fetchAll('SELECT tc.id FROM ap_treatment_containers tc JOIN ap_consignments c ON c.id = tc.consignment_id WHERE tc.treatment_id = ? ORDER BY c.container_no', [$this->tid]), 'id');
         $this->eq = ApId::uuid();

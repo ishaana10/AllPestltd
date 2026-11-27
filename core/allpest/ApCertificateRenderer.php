@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/ApBranding.php';
+
 require_once dirname(__DIR__, 2) . '/lib/tcpdf/tcpdf.php';
 
 /** Renders a certificate's canonical data (see ApCertificates::data) as a PDF string. Certificates are never stored as files. */
@@ -26,8 +28,9 @@ final class ApCertificateRenderer
         $targets = (array)($d['targets'] ?? []);
         $enc = (string)($d['enclosure_type'] ?? '');
         $pp = $d['place_parts'] ?? [];
-        $html = '<h2 style="text-align:center">' . $e($d['provider']['name'] ?? '') . '</h2>'
-            . '<p style="text-align:center">' . nl2br($e($d['provider']['address'] ?? '')) . '</p>'
+        $html = (!empty($d['_branding'])
+            ? ApBranding::headerHtml((array)$d['_branding'])
+            : '<h2 style="text-align:center">' . $e($d['provider']['name'] ?? '') . '</h2>' . '<p style="text-align:center">' . nl2br($e($d['provider']['address'] ?? '')) . '</p>')
             . '<p>Date issued (dd/mm/yyyy): <b>' . $e(self::dmy($d['issued_at'] ?? '')) . '</b></p>'
             . '<h3 style="text-align:center">Treatment certificate – Methyl bromide fumigation</h3>'
             . '<table border="1" cellpadding="4">' . $row('Certificate number', $d['number'] ?? '') . $row('Treatment provider ID number', $d['provider']['provider_id'] ?? '') . $row('Job reference', $d['request_reference'] ?? '') . '</table>'

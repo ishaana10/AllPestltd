@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/ApBranding.php';
+
 require_once dirname(__DIR__, 2) . '/lib/tcpdf/tcpdf.php';
 
 /** Renders ApRof::document() as a PDF laid out like the methodology v3.0 record of fumigation (sections A to E). Times are shown in Fiji time. */
@@ -27,7 +29,7 @@ final class ApRofRenderer
         $names = [];
         foreach ((array)($B['containers'] ?? []) as $c) { $names[(string)$c['id']] = (string)$c['container_no']; }
 
-        $h = '<h3 style="text-align:center">' . $e($d['title'] ?? '') . '</h3>';
+        $h = (!empty($d['_branding']) ? ApBranding::headerHtml((array)$d['_branding']) : '') . '<h3 style="text-align:center">' . $e($d['title'] ?? '') . '</h3>';
         $h .= '<table border="1" cellpadding="3">' . $sec('Section A: Fumigator in charge') . '<tr>' . $cell('Full name', $A['full_name'] ?? '') . $cell('Accreditation number (if applicable)', $A['accreditation_no'] ?? '') . '</tr></table><br/>';
         $h .= '<table border="1" cellpadding="3">' . $sec('Section B: Job details')
             . '<tr>' . $cell('Treatment provider ID', $B['provider_id'] ?? '') . $cell('Client name/details', $B['client'] ?? '') . '</tr>'
