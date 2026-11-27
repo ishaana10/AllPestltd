@@ -25,7 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 if (($_POST['action'] ?? '') === 'install') {
     ApAccess::install($db, (int)ProjectContext::getId());
     $made = ApForms::provision($db, (int)ProjectContext::getId(), (int)($_SESSION['nu_user_id'] ?? 0));
-    echo json_encode(['ok' => true, 'forms_created' => $made]);
+    $token = ApForms::provisionPublicShare($db, (int)ProjectContext::getId(), (string)($_SESSION['nu_user_id'] ?? ''), (string)ApSettings::get('staff_email', ''));
+    echo json_encode(['ok' => true, 'forms_created' => $made, 'public_form' => $token ? 'public_form.php?t=' . $token : null]);
     exit;
 }
 $k = (string)($_POST['key'] ?? '');
