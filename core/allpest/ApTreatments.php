@@ -396,6 +396,8 @@ final class ApTreatments
             throw $e;
         }
         self::audit('treatment.closed', $treatmentId, ['overall' => $res['overall'], 'containers' => $res['containers']]);
+        $done = $db->fetchOne('SELECT status FROM ap_requests WHERE id = ?', [$t['request_id']]);
+        if ($done && $done['status'] === 'completed' && class_exists('ApInvoices', false)) { ApInvoices::raiseForRequest((string)$t['request_id']); }
         return $res;
     }
 
