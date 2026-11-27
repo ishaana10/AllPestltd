@@ -20,6 +20,19 @@ final class ApAudit
         }
     }
 
+    /** A request lifecycle event (received, confirmed, scheduled...) on the studio audit trail. Never blocks the work. */
+    public static function request(string $action, string $requestId, array $details = []): void
+    {
+        try {
+            $a = self::$audit ?? new NuAudit();
+            $user = (string)($_SESSION['nu_username'] ?? ($_SESSION['nu_user_id'] ?? 'public'));
+            $details = ['request_id' => $requestId, 'user' => $user, 'device' => mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? 'server'), 0, 255)] + $details;
+            $a->event($action, $action . ' ' . $requestId, $details, 'success', ['table' => 'ap_requests', 'record_id' => $requestId]);
+        } catch (Throwable $e) {
+            error_log('[ApAudit] ' . $e->getMessage());
+        }
+    }
+
     /** The audit object used for reading the chain back (activity log, integrity check). */
     public static function audit(): NuAudit
     {

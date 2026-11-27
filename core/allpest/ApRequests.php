@@ -101,6 +101,7 @@ final class ApRequests
             throw $e;
         }
 
+        ApAudit::request('request.received', $requestId, ['reference' => $reference, 'containers' => count($cons)]);
         self::notify($reference, $name, $email, count($cons), $site);
         return ['request_id' => $requestId, 'reference' => $reference];
     }
@@ -168,6 +169,7 @@ final class ApRequests
         }
         $extra = array_filter($extra, fn ($v) => $v !== null);
         $db->update('ap_requests', $extra + ['status' => $to, 'updated_at' => gmdate('Y-m-d H:i:s')], 'id = ?', [$requestId]);
+        ApAudit::request('request.' . $to, $requestId, ['from' => $from, 'to' => $to]);
     }
 
     /**
@@ -238,6 +240,7 @@ final class ApRequests
             $db->rollback();
             throw $e;
         }
+        ApAudit::event('treatment.created', $tid, ['request_id' => $requestId, 'containers' => count($ids)]);
         return $tid;
     }
 
