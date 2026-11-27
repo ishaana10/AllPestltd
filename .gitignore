@@ -41,3 +41,6 @@ vendor/
 composer.lock
 config.redis.php
 config.cloud.php
+
+# Superpowers scratch
+.superpowers/
