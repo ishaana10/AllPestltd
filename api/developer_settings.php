@@ -26,6 +26,42 @@ $db = NuDatabase::getInstance();
 $action = $_GET['action'] ?? '';
 
 switch ($action) {
+    case 'db_check':
+    case 'db_run':
+        try {
+            require_once dirname(__DIR__) . '/core/SqlSync.php';
+            $file = dirname(__DIR__) . '/install.sql';
+            if (!is_file($file)) { echo json_encode(['success' => false, 'error' => 'install.sql not found']); break; }
+            if ($action === 'db_check') {
+                $c = SqlSync::check($db, $file);
+                $allpest = (int)$db->fetchOne("SELECT COUNT(*) AS n FROM nu_forms WHERE form_code = 'ap_requests'")['n'] > 0;
+                echo json_encode(['success' => true, 'missing_tables' => $c['tables'], 'missing_columns' => $c['columns'], 'allpest_forms_installed' => $allpest]);
+                break;
+            }
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'error' => 'POST required']); break; }
+            $uuid = (($GLOBALS['nuConfig']['userIdType'] ?? 'auto_increment') === 'uuid');
+            $rep = SqlSync::run($db, $file, $uuid);
+            $rep['allpest'] = [];
+            try {
+                foreach (['ApId', 'ApSchema', 'ApDb', 'ApSettings', 'ApForms'] as $c) { require_once dirname(__DIR__) . "/core/allpest/$c.php"; }
+                require_once dirname(__DIR__) . '/core/allpest/ApAccess.php';
+                require_once dirname(__DIR__) . '/core/ProjectContext.php';
+                $pid = (int)ProjectContext::getId();
+                ApSchema::ensure($db);
+                ApDb::set($db);
+                ApAccess::install($db, $pid);
+                $rep['allpest']['forms_created'] = ApForms::provision($db, $pid, null);
+                $token = ApForms::provisionPublicShare($db, $pid, (string)($currentUser['usr_id'] ?? ''), (string)ApSettings::get('staff_email', ''));
+                $rep['allpest']['public_form'] = $token ? 'public_form.php?t=' . $token : null;
+            } catch (Throwable $e) {
+                $rep['errors'][] = 'All Pest setup: ' . $e->getMessage();
+            }
+            echo json_encode(['success' => empty($rep['errors'])] + $rep);
+        } catch (Throwable $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        break;
+
     case 'get_fn_ref':
         try {
             require_once dirname(__DIR__) . '/core/FnRef.php';
