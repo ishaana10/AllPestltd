@@ -1,6 +1,9 @@
 <?php
+declare(strict_types=1);
 /** Wiring checks for api/form.php: form saves reach the studio audit trail and empty dates/numbers do not break MySQL. */
-class FormSaveHardeningTest extends MiniTestCase
+use PHPUnit\Framework\TestCase;
+
+final class FormSaveHardeningTest extends TestCase
 {
     private function src(): string { return (string)file_get_contents(__DIR__ . '/../../../api/form.php'); }
 
