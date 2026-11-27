@@ -41,7 +41,7 @@ window.ApSigning = (function () {
       };
       $('issue').onclick = function () { U.post('certificates.php', { action: 'issue', treatment_id: id }).then(function (r) { var sk = r.skipped || {}, ids = Array.isArray(sk) ? sk : Object.keys(sk), why = {};
           ids.forEach(function (k) { (Array.isArray(sk) ? [] : (sk[k] || [])).forEach(function (m) { why[String(m).replace(/_/g, ' ')] = 1; }); });
-          U.toast('Issued ' + (r.issued || []).length + (ids.length ? ', ' + ids.length + ' not ready' + (Object.keys(why).length ? ' (waiting for: ' + Object.keys(why).join(', ') + ')' : '') : '')); load(); }, U.fail); };
+          var ex = (r.existing || []).length; U.toast((r.issued || []).length ? 'Issued ' + (r.issued || []).length + (ex ? ' (' + ex + ' already issued)' : '') : (ex ? ex + ' certificate' + (ex > 1 ? 's' : '') + ' already issued, nothing new to issue' : 'Issued 0') + (ids.length ? ', ' + ids.length + ' not ready' + (Object.keys(why).length ? ' (waiting for: ' + Object.keys(why).join(', ') + ')' : '') : '')); load(); }, U.fail); };
       $('resend').onclick = function () { U.post('certificates.php', { action: 'resend_pending' }).then(function (r) { U.toast('Sent ' + r.sent); load(); }, U.fail); };
       $('pack').href = (window.AP_API || '../../api/allpest/') + 'audit_pack.php?treatment_id=' + encodeURIComponent(id);
     }

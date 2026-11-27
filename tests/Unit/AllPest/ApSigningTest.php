@@ -293,6 +293,13 @@ final class ApSigningTest extends TestCase
         $this->assertStringContainsString('Object.keys(sk)', $js);
     }
 
+    public function testIssueMessageSaysWhenCertificatesAlreadyExist(): void
+    {
+        $js = (string)file_get_contents(dirname(__DIR__, 3) . '/assets/js/allpest/signing.js');
+        $this->assertStringContainsString('r.existing', $js);
+        $this->assertStringContainsString('already issued', $js);
+    }
+
     public function testSigningResultsAreShownNextToTheButtons(): void
     {
         $js = (string)file_get_contents(dirname(__DIR__, 3) . '/assets/js/allpest/signing.js');
