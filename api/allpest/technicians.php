@@ -2,13 +2,14 @@
 declare(strict_types=1);
 /** Admin API: technicians and officers. GET ?list=technicians|officers|expiring ; POST action=create_technician|add_officer|attach_file. */
 require_once dirname(__DIR__, 2) . '/core/module_bootstrap.php';
+require_once dirname(__DIR__, 2) . '/core/allpest/ApAccess.php';
 foreach (['ApId', 'ApSchema', 'ApDb', 'ApTechnicians'] as $c) { require_once dirname(__DIR__, 2) . "/core/allpest/$c.php"; }
 
 header('Content-Type: application/json');
-if (!$auth->hasPermission('allpest.admin')) { http_response_code(403); echo json_encode(['error' => 'Access denied']); exit; }
 $db = NuDatabase::getInstance();
 ApSchema::ensure($db);
 ApDb::set($db);
+ApAccess::guard('admin.technicians');
 $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {

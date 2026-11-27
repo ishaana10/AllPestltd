@@ -2,14 +2,15 @@
 declare(strict_types=1);
 /** Admin API: treatment schedules. GET lists; POST saves (admin only). */
 require_once dirname(__DIR__, 2) . '/core/module_bootstrap.php';
+require_once dirname(__DIR__, 2) . '/core/allpest/ApAccess.php';
 foreach (['ApId', 'ApSchema', 'ApDb', 'ApSchedules'] as $c) { require_once dirname(__DIR__, 2) . "/core/allpest/$c.php"; }
 
 header('Content-Type: application/json');
-$isAdmin = $auth->hasPermission('allpest.admin');
-if (!$isAdmin && !$auth->hasPermission('allpest.field')) { http_response_code(403); echo json_encode(['error' => 'Access denied']); exit; }
 $db = NuDatabase::getInstance();
 ApSchema::ensure($db);
 ApDb::set($db);
+$isAdmin = ApAccess::can((string)($_SESSION['nu_user_id'] ?? ''), 'admin.schedules');
+if (!$isAdmin) { ApAccess::guard('treatment.record'); }
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') { echo json_encode(ApSchedules::all()); exit; }
 if (!$isAdmin) { http_response_code(403); echo json_encode(['error' => 'Access denied']); exit; }

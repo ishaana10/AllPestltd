@@ -6,12 +6,16 @@ declare(strict_types=1);
  * token-protected path (public_allpest_request.php) and does not use this endpoint.
  */
 require_once dirname(__DIR__, 2) . '/core/module_bootstrap.php';
+require_once dirname(__DIR__, 2) . '/core/allpest/ApAccess.php';
 require_once dirname(__DIR__, 2) . '/core/allpest/ApSchema.php';
 require_once dirname(__DIR__, 2) . '/core/allpest/ApUploads.php';
 
 header('Content-Type: application/json');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['error' => 'POST only']); exit; }
-if (!$auth->hasPermission('allpest.field')) { http_response_code(403); echo json_encode(['error' => 'Access denied']); exit; }
+$__db = NuDatabase::getInstance();
+ApSchema::ensure($__db);
+ApDb::set($__db);
+ApAccess::guard('treatment.record');
 
 $purpose = (string)($_POST['purpose'] ?? '');
 if (!in_array($purpose, ['reading_photo', 'signature', 'technician_cert', 'equipment', 'other'], true)) {

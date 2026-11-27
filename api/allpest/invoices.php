@@ -2,13 +2,14 @@
 declare(strict_types=1);
 /** Admin API: invoice links. GET ?request_id= | list ; POST action=release|retry (request_id). */
 require_once dirname(__DIR__, 2) . '/core/module_bootstrap.php';
+require_once dirname(__DIR__, 2) . '/core/allpest/ApAccess.php';
 foreach (['ApId', 'ApSchema', 'ApDb', 'ApSettings', 'ApErpxClient', 'ApInvoices'] as $c) { require_once dirname(__DIR__, 2) . "/core/allpest/$c.php"; }
 
 header('Content-Type: application/json');
-if (!$auth->hasPermission('allpest.admin')) { http_response_code(403); echo json_encode(['error' => 'Access denied']); exit; }
 $db = NuDatabase::getInstance();
 ApSchema::ensure($db);
 ApDb::set($db);
+ApAccess::guard('admin.invoices');
 $user = (string)($_SESSION['nu_user_id'] ?? '');
 
 try {

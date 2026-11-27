@@ -2,13 +2,14 @@
 declare(strict_types=1);
 /** Admin API: certificates. GET ?treatment_id= status per container ; POST action=verify (container_id) | issue (treatment_id) | resend_pending. */
 require_once dirname(__DIR__, 2) . '/core/module_bootstrap.php';
+require_once dirname(__DIR__, 2) . '/core/allpest/ApAccess.php';
 foreach (['ApId', 'ApSchema', 'ApDb', 'ApSettings', 'ApUploads', 'ApRequests', 'ApTreatments', 'ApCertificates'] as $c) { require_once dirname(__DIR__, 2) . "/core/allpest/$c.php"; }
 
 header('Content-Type: application/json');
-if (!$auth->hasPermission('allpest.admin')) { http_response_code(403); echo json_encode(['error' => 'Access denied']); exit; }
 $db = NuDatabase::getInstance();
 ApSchema::ensure($db);
 ApDb::set($db);
+ApAccess::guard('admin.certificates');
 $adminVerify = ApSettings::get('certificate_admin_verify', '0') === '1';
 
 try {

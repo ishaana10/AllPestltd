@@ -5,13 +5,14 @@ declare(strict_types=1);
  * Times arrive as ISO-8601 (the tablet sends its local time with offset) and are stored in UTC.
  */
 require_once dirname(__DIR__, 2) . '/core/module_bootstrap.php';
+require_once dirname(__DIR__, 2) . '/core/allpest/ApAccess.php';
 foreach (['ApId', 'ApSchema', 'ApDb', 'ApSettings', 'ApUploads', 'ApRequests', 'ApTreatments'] as $c) { require_once dirname(__DIR__, 2) . "/core/allpest/$c.php"; }
 
 header('Content-Type: application/json');
-if (!$auth->hasPermission('allpest.field')) { http_response_code(403); echo json_encode(['error' => 'Access denied']); exit; }
 $db = NuDatabase::getInstance();
 ApSchema::ensure($db);
 ApDb::set($db);
+ApAccess::guard('treatment.record');
 $utc = new DateTimeZone('UTC');
 $when = function (string $k) use ($utc): DateTimeImmutable {
     $v = (string)($_POST[$k] ?? '');
@@ -20,6 +21,7 @@ $when = function (string $k) use ($utc): DateTimeImmutable {
 
 try {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        ApAccess::guard('treatment.view', (string)($_GET['id'] ?? ''));
         $t = $db->fetchOne('SELECT * FROM ap_treatments WHERE id = ?', [(string)($_GET['id'] ?? '')]);
         if (!$t) { http_response_code(404); echo json_encode(['error' => 'Not found']); exit; }
         $t['containers'] = $db->fetchAll('SELECT tc.*, c.container_no, c.seal_no FROM ap_treatment_containers tc JOIN ap_consignments c ON c.id = tc.consignment_id WHERE tc.treatment_id = ? ORDER BY c.container_no', [$t['id']]);
@@ -27,6 +29,7 @@ try {
         exit;
     }
     $tid = (string)($_POST['treatment_id'] ?? '');
+    ApAccess::guard('treatment.record', $tid);
     switch ((string)($_POST['action'] ?? '')) {
         case 'precheck':
             $in = json_decode((string)($_POST['input'] ?? ''), true);

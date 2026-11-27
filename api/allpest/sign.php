@@ -5,13 +5,14 @@ declare(strict_types=1);
  * The signing user is always the signed-in session user, never a value from the request.
  */
 require_once dirname(__DIR__, 2) . '/core/module_bootstrap.php';
+require_once dirname(__DIR__, 2) . '/core/allpest/ApAccess.php';
 foreach (['ApId', 'ApSchema', 'ApDb', 'ApSettings', 'ApUploads', 'ApRequests', 'ApTreatments', 'ApSigning'] as $c) { require_once dirname(__DIR__, 2) . "/core/allpest/$c.php"; }
 
 header('Content-Type: application/json');
-if (!$auth->hasPermission('allpest.field')) { http_response_code(403); echo json_encode(['error' => 'Access denied']); exit; }
 $db = NuDatabase::getInstance();
 ApSchema::ensure($db);
 ApDb::set($db);
+ApAccess::guard('treatment.sign');
 $userId = (string)($_SESSION['nu_user_id'] ?? '');
 if ($userId === '' || $userId === 'guest_tester') { http_response_code(403); echo json_encode(['error' => 'Access denied']); exit; }
 
@@ -29,6 +30,7 @@ $verify = function (string $uid, string $password, ?string $mfa) use ($db, $auth
 $signing = new ApSigning($verify);
 $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
 $tid = (string)($_POST['treatment_id'] ?? $_GET['treatment_id'] ?? '');
+ApAccess::guard(($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' ? 'treatment.view' : 'treatment.sign', $tid);
 
 try {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
