@@ -329,6 +329,17 @@ if (!$currentUser || strtolower((string)$currentUser['usr_role']) !== 'globeadmi
 
     <!-- Panel 1: General Branding & Global Hashes -->
     <div class="nu-dev-panel active" id="panelGeneral">
+        <!-- Database: install.sql vs live database -->
+        <div class="nu-dev-section">
+            <h4 class="nu-section-title">Database</h4>
+            <p class="nu-field-desc">Compares install.sql with this database. Missing tables and columns are created, and the All Pest forms and menu are set up. Nothing existing is changed or dropped.</p>
+            <div style="display:flex;gap:8px;margin:10px 0;">
+                <button type="button" class="nu-btn nu-btn-ghost" onclick="DevSettings.dbCheck()">Check for missing SQL</button>
+                <button type="button" class="nu-btn nu-btn-primary" onclick="DevSettings.dbRun()">Run missing SQL and set up All Pest</button>
+            </div>
+            <pre id="devDbResult" style="white-space:pre-wrap;font-size:12px;margin:0;"></pre>
+        </div>
+
         <!-- Application Brand Section -->
         <div class="nu-dev-section">
             <h4 class="nu-section-title">Application Branding</h4>
@@ -1104,6 +1115,35 @@ var DevSettings = (function() {
             .replace(/'/g, '&#039;');
     }
 
+    function dbShow(j) {
+        var el = document.getElementById('devDbResult');
+        if (!j || j.success === undefined && j.error) { el.textContent = 'Error: ' + (j && j.error); return; }
+        var lines = [];
+        if (j.missing_tables) {
+            lines.push('Missing tables: ' + (j.missing_tables.length ? j.missing_tables.join(', ') : 'none'));
+            var mc = Object.keys(j.missing_columns || {}).map(function (t) { return t + ' (' + j.missing_columns[t].join(', ') + ')'; });
+            lines.push('Missing columns: ' + (mc.length ? mc.join('; ') : 'none'));
+            lines.push('All Pest forms: ' + (j.allpest_forms_installed ? 'installed' : 'not installed (Run will install them)'));
+        } else {
+            lines.push('Tables created: ' + ((j.created || []).join(', ') || 'none'));
+            var ac = Object.keys(j.columns || {}).map(function (t) { return t + ' (' + j.columns[t].join(', ') + ')'; });
+            lines.push('Columns added: ' + (ac.join('; ') || 'none'));
+            lines.push('Seed rows added: ' + (j.seeded || 0));
+            if (j.allpest) { lines.push('All Pest forms created: ' + ((j.allpest.forms_created || []).length)); if (j.allpest.public_form) { lines.push('Customer request link: ' + new URL(j.allpest.public_form, location.href.replace(/[^\/]*$/, '')).href); } }
+            if ((j.errors || []).length) { lines.push('Errors:'); j.errors.forEach(function (e) { lines.push('  ' + e); }); } else { lines.push('Done. Reload the page to see new menu entries.'); }
+        }
+        el.textContent = lines.join('\n');
+    }
+    function dbCheck() {
+        document.getElementById('devDbResult').textContent = 'Checking…';
+        fetch(API + '?action=db_check', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(dbShow).catch(function () { dbShow({ error: 'request failed' }); });
+    }
+    function dbRun() {
+        if (!confirm('Create missing tables and columns and set up All Pest now?')) { return; }
+        document.getElementById('devDbResult').textContent = 'Running…';
+        fetch(API + '?action=db_run', { method: 'POST', credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(dbShow).catch(function () { dbShow({ error: 'request failed' }); });
+    }
+
     function init() {
         loadSettings();
         bindFileUpload();
@@ -1112,6 +1152,8 @@ var DevSettings = (function() {
     return {
         init: init,
         switchTab: switchTab,
+        dbCheck: dbCheck,
+        dbRun: dbRun,
         addRow: addRow,
         removeLogo: removeLogo,
         loadSettings: loadSettings,
