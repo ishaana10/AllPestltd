@@ -3,6 +3,7 @@ declare(strict_types=1);
 /** Admin API: install settings. GET returns them (the ERPX key is masked) plus due reminders; POST {key, value} sets one whitelisted key; POST action=install creates roles and the menu. */
 require_once dirname(__DIR__, 2) . '/core/module_bootstrap.php';
 require_once dirname(__DIR__, 2) . '/core/allpest/ApAccess.php';
+require_once dirname(__DIR__, 2) . '/core/allpest/ApForms.php';
 foreach (['ApId', 'ApSchema', 'ApDb', 'ApSettings', 'ApStock', 'ApReminders'] as $c) { require_once dirname(__DIR__, 2) . "/core/allpest/$c.php"; }
 
 header('Content-Type: application/json');
@@ -23,7 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 }
 if (($_POST['action'] ?? '') === 'install') {
     ApAccess::install($db, (int)ProjectContext::getId());
-    echo json_encode(['ok' => true]);
+    $made = ApForms::provision($db, (int)ProjectContext::getId(), (int)($_SESSION['nu_user_id'] ?? 0));
+    echo json_encode(['ok' => true, 'forms_created' => $made]);
     exit;
 }
 $k = (string)($_POST['key'] ?? '');
