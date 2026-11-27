@@ -5,8 +5,14 @@ require_once __DIR__ . '/ApId.php';
 require_once __DIR__ . '/ApDb.php';
 require_once __DIR__ . '/ApSettings.php';
 require_once __DIR__ . '/ApUploads.php';
+require_once __DIR__ . '/ApTechnicians.php';
 
 class ApIntakeRejected extends RuntimeException
+{
+}
+
+/** An illegal request status jump, or an action that the request's current status does not allow. */
+class ApRequestStateError extends RuntimeException
 {
 }
 
@@ -97,6 +103,106 @@ final class ApRequests
 
         self::notify($reference, $name, $email, count($cons), $site);
         return ['request_id' => $requestId, 'reference' => $reference];
+    }
+
+    private const NEXT = ['new' => 'confirmed', 'confirmed' => 'scheduled', 'scheduled' => 'in_progress', 'in_progress' => 'completed'];
+
+    /**
+     * Admin review: new -> confirmed. $plan may carry site_lat / site_lng, which are saved on the request.
+     * @param array<string,mixed> $plan
+     */
+    public static function confirm(string $requestId, array $plan, string $adminId): void
+    {
+        $set = [];
+        foreach (['site_lat', 'site_lng'] as $k) {
+            if (isset($plan[$k]) && is_numeric($plan[$k])) { $set[$k] = (float)$plan[$k]; }
+        }
+        self::advance($requestId, 'confirmed', $set + ['notes' => trim((string)($plan['notes'] ?? '')) ?: null]);
+    }
+
+    /** Move one step along new -> confirmed -> scheduled -> in_progress -> completed; anything else throws. */
+    public static function advance(string $requestId, string $to, array $extra = []): void
+    {
+        $db = ApDb::get();
+        $req = $db->fetchOne('SELECT status FROM ap_requests WHERE id = ?', [$requestId]);
+        if (!$req) { throw new InvalidArgumentException('Unknown request'); }
+        $from = (string)$req['status'];
+        if ((self::NEXT[$from] ?? null) !== $to) {
+            throw new ApRequestStateError("A request cannot go from '$from' to '$to'.");
+        }
+        $extra = array_filter($extra, fn ($v) => $v !== null);
+        $db->update('ap_requests', $extra + ['status' => $to, 'updated_at' => gmdate('Y-m-d H:i:s')], 'id = ?', [$requestId]);
+    }
+
+    /**
+     * Group consignments of a confirmed request into one treatment (one ROF). A request may have several treatments;
+     * each container belongs to exactly one. $plan: scheduled_start (UTC), site_lat, site_lng, technician_id, officer_id,
+     * schedule_id, rof_type (general|perishable), enclosure_type, fumigation_type (ambient|controlled).
+     * @param string[] $containerIds consignment ids
+     * @param array<string,mixed> $plan
+     * @return string treatment id
+     */
+    public static function createTreatment(string $requestId, array $containerIds, array $plan): string
+    {
+        $db = ApDb::get();
+        $req = $db->fetchOne('SELECT status, job_type FROM ap_requests WHERE id = ?', [$requestId]);
+        if (!$req) { throw new InvalidArgumentException('Unknown request'); }
+        if (!in_array($req['status'], ['confirmed', 'scheduled'], true)) {
+            throw new ApRequestStateError("A request must be confirmed before it is scheduled (it is '{$req['status']}').");
+        }
+        if ($req['job_type'] !== 'fumigation') { throw new InvalidArgumentException('Treatment screens exist for fumigation requests only.'); }
+
+        $ids = array_values(array_unique(array_map('strval', $containerIds)));
+        if (!$ids) { throw new InvalidArgumentException('Choose at least one container.'); }
+        $rof = (string)($plan['rof_type'] ?? '');
+        if (!in_array($rof, ['general', 'perishable'], true)) { throw new InvalidArgumentException('ROF type must be general or perishable.'); }
+        $fum = (string)($plan['fumigation_type'] ?? '');
+        if (!in_array($fum, ['ambient', 'controlled'], true)) { throw new InvalidArgumentException('Fumigation type must be ambient or controlled.'); }
+        try {
+            $start = new DateTimeImmutable((string)($plan['scheduled_start'] ?? ''), new DateTimeZone('UTC'));
+        } catch (Throwable $e) {
+            throw new InvalidArgumentException('A scheduled start time is required.');
+        }
+        $techId = (string)($plan['technician_id'] ?? '');
+        if (!ApTechnicians::canSign($techId, $start->setTimezone(new DateTimeZone('Pacific/Fiji')))) {
+            throw new InvalidArgumentException('The technician is not active or their registration will have expired by the treatment date.');
+        }
+        $officerId = (string)($plan['officer_id'] ?? '');
+        if ($officerId === '' || !$db->fetchOne("SELECT id FROM ap_officers WHERE id = ? AND status = 'active'", [$officerId])) {
+            throw new InvalidArgumentException('Choose a supervising Biosecurity officer.');
+        }
+        $sched = $db->fetchOne('SELECT treatment_type, active FROM ap_schedules WHERE id = ?', [(string)($plan['schedule_id'] ?? '')]);
+        if (!$sched || (int)$sched['active'] !== 1) { throw new InvalidArgumentException('Choose an active treatment schedule.'); }
+        if ($sched['treatment_type'] !== $rof) { throw new InvalidArgumentException('The schedule is for ' . $sched['treatment_type'] . ' treatments, not ' . $rof . '.'); }
+
+        $db->beginTransaction();
+        try {
+            foreach ($ids as $cid) {
+                $c = $db->fetchOne('SELECT request_id FROM ap_consignments WHERE id = ?', [$cid]);
+                if (!$c || $c['request_id'] !== $requestId) { throw new InvalidArgumentException('A container does not belong to this request.'); }
+                if ($db->fetchOne('SELECT id FROM ap_treatment_containers WHERE consignment_id = ?', [$cid])) {
+                    throw new InvalidArgumentException('A container is already in another treatment.');
+                }
+            }
+            $tid = ApId::uuid();
+            $db->insert('ap_treatments', [
+                'id' => $tid, 'request_id' => $requestId, 'rof_type' => $rof, 'status' => 'planned', 'schedule_id' => (string)$plan['schedule_id'],
+                'technician_id' => $techId, 'officer_id' => $officerId, 'scheduled_start' => $start->format('Y-m-d H:i:s'),
+                'site_lat' => isset($plan['site_lat']) && is_numeric($plan['site_lat']) ? (float)$plan['site_lat'] : null,
+                'site_lng' => isset($plan['site_lng']) && is_numeric($plan['site_lng']) ? (float)$plan['site_lng'] : null,
+                'fumigation_type' => $fum, 'enclosure_type' => ($plan['enclosure_type'] ?? '') !== '' ? (string)$plan['enclosure_type'] : null,
+                'version' => 1, 'created_at' => gmdate('Y-m-d H:i:s'),
+            ]);
+            foreach ($ids as $cid) {
+                $db->insert('ap_treatment_containers', ['id' => ApId::uuid(), 'treatment_id' => $tid, 'consignment_id' => $cid]);
+            }
+            if ($req['status'] === 'confirmed') { self::advance($requestId, 'scheduled'); }
+            $db->commit();
+        } catch (Throwable $e) {
+            $db->rollback();
+            throw $e;
+        }
+        return $tid;
     }
 
     private static function throttle(string $ip): void
