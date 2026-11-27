@@ -156,7 +156,7 @@ final class ApForms
     /** Sidebar entries that open a studio module rather than a form: target => [label, order, roles]. */
     public static function moduleEntries(): array
     {
-        return ['allpest_work' => ['Treatment Workspace', 5, self::FIELD]];
+        return ['allpest_work' => ['Treatment Workspace', 5, self::FIELD], 'allpest_board' => ['Request Board', 6, self::ADMIN]];
     }
 
     /** PHP run when the staff request form is opened: bring in the containers of any new public requests first. */
