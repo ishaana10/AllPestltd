@@ -5,7 +5,8 @@ window.ApQueue = (function () {
   var KEY = 'allpest.queue.v1', busy = false, listeners = [];
   function load() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; } }
   function save(q) { try { localStorage.setItem(KEY, JSON.stringify(q)); } catch (e) { throw new Error('This device is out of storage; connect to send the saved readings first.'); } notify(); }
-  function notify() { var n = load().length; listeners.forEach(function (f) { f(n); }); }
+  function loadRej() { try { return JSON.parse(localStorage.getItem(KEY + '.rejected') || '[]'); } catch (e) { return []; } }
+  function notify() { var n = load().length, r = loadRej().length; listeners.forEach(function (f) { f(n, r); }); }
   function uuid() {
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
     var b = new Uint8Array(16); crypto.getRandomValues(b); b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
@@ -39,7 +40,8 @@ window.ApQueue = (function () {
     function next() {
       var q = load(); if (!q.length) { busy = false; return Promise.resolve(); }
       return send(q[0]).then(function (res) { var q2 = load(); q2.shift(); save(q2); if (onResult) onResult(q[0], res, null); return next(); }, function (err) {
-        if (err.fatal) { var q3 = load(); var bad = q3.shift(); save(q3); var rej = JSON.parse(localStorage.getItem(KEY + '.rejected') || '[]'); bad.error = err.message; rej.push(bad); localStorage.setItem(KEY + '.rejected', JSON.stringify(rej)); if (onResult) onResult(bad, null, err); return next(); }
+        if (!err.fatal && err.status >= 500) { var q5 = load(); if (q5[0]) { q5[0].fails = (q5[0].fails || 0) + 1; q5[0].file_ids = q[0].file_ids; if (q5[0].fails >= 5) { err.fatal = true; err.message = 'The server kept failing (' + err.message + '). Re-enter this reading set.'; } else { save(q5); } } }
+        if (err.fatal) { var q3 = load(); var bad = q3.shift(); save(q3); var rej = JSON.parse(localStorage.getItem(KEY + '.rejected') || '[]'); bad.error = err.message; rej.push(bad); localStorage.setItem(KEY + '.rejected', JSON.stringify(rej)); notify(); if (onResult) onResult(bad, null, err); return next(); }
         var q4 = load(); if (q4[0]) { q4[0].file_ids = q[0].file_ids; save(q4); }
         busy = false; return Promise.resolve();
       });
@@ -47,5 +49,13 @@ window.ApQueue = (function () {
     return next();
   }
   window.addEventListener('online', function () { flush(); });
-  return { uuid: uuid, enqueue: enqueue, flush: flush, size: function () { return load().length; }, rejected: function () { try { return JSON.parse(localStorage.getItem(KEY + '.rejected') || '[]'); } catch (e) { return []; } }, onChange: function (f) { listeners.push(f); f(load().length); } };
+  // Anything saved on this device by an earlier visit is sent as soon as a page loads.
+  setTimeout(function () { flush(); }, 0);
+  function statusText(n, r) {
+    var t = '';
+    if (n) t += n + ' reading set(s) saved on this device, waiting to send. ';
+    if (r) t += r + ' reading set(s) were REJECTED by the server and are NOT recorded (' + loadRej().map(function (x) { return (x.stage || '') + ': ' + (x.error || 'rejected'); }).join('; ') + '). Re-enter them.';
+    return t;
+  }
+  return { statusText: statusText, uuid: uuid, enqueue: enqueue, flush: flush, size: function () { return load().length; }, rejected: function () { try { return JSON.parse(localStorage.getItem(KEY + '.rejected') || '[]'); } catch (e) { return []; } }, onChange: function (f) { listeners.push(f); f(load().length, loadRej().length); }, clearRejected: function () { try { localStorage.setItem(KEY + '.rejected', '[]'); } catch (e) {} notify(); } };
 })();

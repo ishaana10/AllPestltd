@@ -10,7 +10,7 @@
     return;
   }
   $('rof').hidden = false;
-  ApQueue.onChange(function (n) { $('queue').textContent = n ? n + ' reading set(s) saved on this device, waiting to send.' : ''; });
+  ApQueue.onChange(function (n, r) { $('queue').textContent = ApQueue.statusText(n, r); });
 
   function reload() {
     return Promise.all([U.get('treatments.php', { id: id, live: 1 }), U.get('equipment.php'), U.get('treatments.php', { lots: 1 })]).then(function (a) { T = a[0]; EQ = a[1]; LOTS = a[2]; render(); }, U.fail);

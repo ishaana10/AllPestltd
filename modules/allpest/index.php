@@ -15,6 +15,6 @@ ApUi.get('treatments.php',{mine:1}).then(function(r){ApUi.table(document.getElem
 <?php if ($isAdmin): ?>
 ApUi.get('settings.php').then(function(d){ApUi.table(document.getElementById('due'),d.reminders,[{label:'What',key:'kind'},{label:'Item',key:'subject'},{label:'Due',key:'due'}]);},ApUi.fail);
 <?php endif; ?>
-ApQueue.onChange(function(n){document.getElementById('queue').textContent=n?n+' reading set(s) waiting to be sent. They will send when you are online.':'';});ApQueue.flush();
+ApQueue.onChange(function(n,r){document.getElementById('queue').textContent=ApQueue.statusText(n,r);});
 </script>
 <?php ap_page_end(['compress.js', 'queue.js']);

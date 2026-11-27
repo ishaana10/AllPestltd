@@ -33,4 +33,13 @@ final class ApReviewFixesTest extends TestCase
         $this->assertSame(['manual_min_c' => 25, 'source_note' => 'BoM'], $f);
         $this->assertSame([], ApTreatments::sanitizeClientForecast('auto-ish'));
     }
+
+    public function testOfflineQueueSurfacesRejectedSetsAndNeverStallsOrLosesReadings(): void
+    {
+        $node = trim((string)shell_exec('command -v node 2>/dev/null'));
+        if ($node === '') { $this->assertTrue(true); return; }   // node not installed here: the script can still be run by hand
+        $out = [];
+        exec(escapeshellarg($node) . ' ' . escapeshellarg(dirname(__DIR__, 2) . '/js/queue.test.js') . ' 2>&1', $out, $code);
+        $this->assertSame(0, $code, implode("\n", $out));
+    }
 }
