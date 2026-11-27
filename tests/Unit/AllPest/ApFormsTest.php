@@ -86,7 +86,11 @@ final class ApFormsTest extends TestCase
         $expected = array_keys(array_filter(ApForms::definitions(), fn ($d) => !in_array($d['type'] ?? 'main', ['subform', 'public'], true)));
         $this->assertSame([], array_diff($expected, array_column($kids, 'menu_target')));
         $this->assertContains('allpest_work', array_column($kids, 'menu_target'));
-        $this->assertContains('allpest_board', array_column($kids, 'menu_target'));
+        foreach (['allpest_board', 'allpest_stock', 'allpest_settings'] as $m) {
+            $this->assertContains($m, array_column($kids, 'menu_target'));
+            $this->assertTrue(is_file(dirname(__DIR__, 3) . "/modules/$m/$m.php"));
+            $this->assertStringContainsString("'$m'", (string)file_get_contents(dirname(__DIR__, 3) . '/assets/js/nubuilder-next.js'));
+        }
         $this->assertCount(count($expected) + count(ApForms::moduleEntries()), $kids);
         $this->assertStringContainsString('ap_technician', (string)$g[0]['menu_role_access']);
     }
