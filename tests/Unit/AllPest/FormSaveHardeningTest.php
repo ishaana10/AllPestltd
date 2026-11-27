@@ -46,4 +46,11 @@ final class FormSaveHardeningTest extends TestCase
         $src = (string)file_get_contents(dirname(__DIR__, 3) . '/api/allpest/sign.php');
         $this->assertSame(0, preg_match('/SELECT[^;]*usr_2fa_enabled[^;]*FROM nu_users/', $src));
     }
+
+    public function testTreatmentApiLoadsInvoicingSoClosingTheLastRecordRaisesTheInvoice(): void
+    {
+        $src = (string)file_get_contents(dirname(__DIR__, 3) . '/api/allpest/treatments.php');
+        $this->assertStringContainsString("'ApInvoices'", $src);
+        $this->assertStringContainsString("'ApErpxClient'", $src);
+    }
 }

@@ -41,11 +41,12 @@ if (!ApAccess::can($uid, 'admin.pages') && !ApAccess::can($uid, 'treatment.recor
       <button class="ap-btn" id="n_go">Create record</button>
     </div></div>
   <p id="msg" class="ap-muted noprint"></p>
+  <p class="noprint" id="bar" hidden><button class="ap-btn alt" id="b_back" type="button">&larr; All records / start a new record</button></p>
   <div id="doc" class="rof" hidden></div>
 </div>
 <script>
 (function () {
-  var TAPI = 'api/allpest/treatments.php', API = 'api/allpest/rof.php', doc = null, tid = null;
+  var TAPI = 'api/allpest/treatments.php', API = 'api/allpest/rof.php', doc = null, tid = null, canNew = false;
   var $ = function (id) { return document.getElementById(id); };
   function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
   function say(t, bad) { var m = $('msg'); m.textContent = t; m.style.color = bad ? '#b91c1c' : ''; }
@@ -115,7 +116,7 @@ if (!ApAccess::can($uid, 'admin.pages') && !ApAccess::can($uid, 'treatment.recor
     var nextStep = {planned: 'Do the pre-treatment check.', prechecked: 'Apply the gas and record the dose.', dosed: 'Take the start-point readings.', exposure: 'Take exposure readings, then top-up if needed and start ventilation.', ventilating: 'Record the TLV readings, then close the treatment.', closed: 'Sign the record and issue certificates.'}[d.status] || '';
     h += '<p class="noprint">Status: <strong>' + esc(d.status) + '</strong>' + (nextStep && !dis ? '. Next: ' + esc(nextStep) : '') + '</p>';
     h += '<p class="noprint">' + (dis ? '' : '<button class="ap-btn" id="goWork">Record dosing, readings, top-up and TLV</button> ') + '<button class="ap-btn" onclick="window.print()">Print</button> <a class="ap-btn" href="api/allpest/rof.php?id=' + encodeURIComponent(tid) + '&pdf=1">Download PDF</a> <button class="ap-btn" id="backList">All records</button></p>';
-    $('doc').innerHTML = h; $('doc').hidden = false; $('pick').hidden = true;
+    $('doc').innerHTML = h; $('doc').hidden = false; $('pick').hidden = true; $('newcard').hidden = true; $('bar').hidden = false;
     var gw = $('goWork'); if (gw) { gw.onclick = function () { window.AP_NEXT = tid; NuApp.loadModule('allpest_work'); }; }
     var bl = $('backList'); if (bl) { bl.onclick = function () { NuApp.loadModule('allpest_rof'); }; }
     var sd = $('saveDet'); if (sd) { sd.onclick = saveDetails; }
@@ -139,7 +140,7 @@ if (!ApAccess::can($uid, 'admin.pages') && !ApAccess::can($uid, 'treatment.recor
   function fillSched() { fillSel('n_sched', opts.schedules, 'name', function (s) { return s.treatment_type === $('n_type').value; }); }
   fetch(API + '?options=1', {credentials: 'same-origin'}).then(function (r) { return r.ok ? r.json() : null; }).then(function (o) {
     if (!o) { return; }
-    opts = o; $('newcard').hidden = false;
+    opts = o; canNew = true; $('newcard').hidden = !$('doc').hidden;
     fillSel('n_tech', o.technicians, 'full_name'); fillSel('n_off', o.officers, 'full_name'); fillSched(); $('n_type').onchange = fillSched;
     var miss = []; if (!o.technicians.length) { miss.push('a technician'); } if (!o.officers.length) { miss.push('an officer'); } if (!o.schedules.length) { miss.push('a treatment schedule'); }
     if (miss.length) { $('needs').textContent = 'Before you can start a record, add ' + miss.join(', ') + ' from the All Pest menu (Technicians, Officers, Schedules).'; $('newform').hidden = true; }
@@ -149,6 +150,7 @@ if (!ApAccess::can($uid, 'admin.pages') && !ApAccess::can($uid, 'treatment.recor
         scheduled_start: $('n_start').value ? new Date($('n_start').value).toISOString() : ''}).then(function (j) { say('Created ' + j.reference + ((j.treatment_ids || []).length > 1 ? ' with ' + j.treatment_ids.length + ' records, one per container' : '') + '.'); $('newcard').hidden = true; load(j.treatment_id); }).catch(function (e) { say(e.message, true); });
     };
   }).catch(function () {});
+  $('b_back').onclick = function () { $('doc').hidden = true; $('bar').hidden = true; $('pick').hidden = false; $('newcard').hidden = !canNew; say(''); };
   var pre = window.AP_ROF_NEXT || null; window.AP_ROF_NEXT = null;
   if (pre) { load(pre); }
   fetch(TAPI + '?mine=1', {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (rows) {
