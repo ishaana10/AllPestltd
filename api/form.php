@@ -3027,6 +3027,9 @@ function nu_handle_save() {
     $fields = nu_flatten_layout(nu_decode_layout($form));
 
     $save = [];
+    // A form may define its own user_id field (a user picker). Then it is the form's data, not the owner column the studio fills in.
+    $formOwnsUserId = false;
+    foreach ($fields as $ff) { if (nu_safe_ident(nu_field_name($ff)) === 'user_id') { $formOwnsUserId = true; break; } }
 
     $suppliedPk = !empty($data[$pk]) ? $data[$pk] : (!empty($data['id']) ? $data['id'] : null);
     if ($suppliedPk !== null && $suppliedPk !== '') {
@@ -3114,7 +3117,7 @@ function nu_handle_save() {
         if ($currentUserId !== null) {
             if (isset($tableColumns['created_by'])) $save['created_by'] = $currentUserId;
             if (isset($tableColumns['updated_by'])) $save['updated_by'] = $currentUserId;
-            if (isset($tableColumns['user_id']))    $save['user_id']    = $currentUserId;
+            if (isset($tableColumns['user_id']) && !$formOwnsUserId) $save['user_id'] = $currentUserId;
         }
         if ($locationVal !== null && isset($tableColumns['location'])) {
             $save['location'] = $locationVal;
@@ -3123,7 +3126,7 @@ function nu_handle_save() {
         // UPDATE
         unset($save['created_at']);
         unset($save['created_by']);
-        unset($save['user_id']);
+        if (!$formOwnsUserId) { unset($save['user_id']); }
         unset($save['location']);
         if (isset($tableColumns['updated_at'])) $save['updated_at'] = $now;
         if ($currentUserId !== null && isset($tableColumns['updated_by'])) {
