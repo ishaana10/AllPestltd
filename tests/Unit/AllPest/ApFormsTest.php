@@ -78,6 +78,16 @@ final class ApFormsTest extends TestCase
         $this->assertSame('["mine"]', $this->db->fetchOne("SELECT form_layout l FROM nu_forms WHERE form_code = 'ap_equipment'")['l']);
     }
 
+    public function testTechniciansAreNotOfferedFormsTheStudioWouldRefuseThem(): void
+    {
+        ApForms::provision($this->db, 1);
+        $this->assertSame('globeadmin,ap_admin', $this->db->fetchOne("SELECT menu_roles r FROM nu_menus WHERE menu_target = 'ap_treatments'")['r']);
+        // an install from an earlier release that still offers it to technicians is corrected
+        $this->db->exec("UPDATE nu_menus SET menu_roles = 'globeadmin,ap_admin,ap_technician' WHERE menu_target = 'ap_treatments'");
+        ApForms::provision($this->db, 1);
+        $this->assertSame('globeadmin,ap_admin', $this->db->fetchOne("SELECT menu_roles r FROM nu_menus WHERE menu_target = 'ap_treatments'")['r']);
+    }
+
     public function testEngineOwnedFormsAreReadOnlyAndCannotBeDeleted(): void
     {
         ApForms::provision($this->db, 1);

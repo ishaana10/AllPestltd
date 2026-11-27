@@ -73,7 +73,7 @@ final class ApForms
                     self::row(self::t('commodity', 'Commodity', 4), self::t('origin', 'Origin', 4), self::t('destination', 'Destination', 4)),
                 ],
                 'browse' => [self::col('container_no', 'Container', '140px'), self::col('seal_no', 'Seal', '120px'), self::col('commodity', 'Commodity', '180px'), self::col('origin', 'Origin', '120px'), self::col('destination', 'Destination', '140px')]],
-            'ap_treatments' => ['table' => 'ap_treatments', 'name' => 'Treatments (ROF)', 'description' => 'Records of fumigation. Dose, readings, signing and closing are done through the treatment actions so the rules are enforced.', 'roles' => self::FIELD, 'readonly' => true, 'order' => 20,
+            'ap_treatments' => ['table' => 'ap_treatments', 'name' => 'Treatments (ROF)', 'description' => 'Records of fumigation. Dose, readings, signing and closing are done through the treatment actions so the rules are enforced.', 'roles' => self::ADMIN, 'readonly' => true, 'order' => 20,
                 'layout' => [
                     self::row(self::ro(self::t('status', 'Status')), self::ro(self::t('rof_type', 'ROF type'))),
                     self::row(self::ro(self::lookup('technician_id', 'Fumigator in charge', 'ap_technicians', 'id', 'full_name')), self::ro(self::lookup('officer_id', 'Supervising officer', 'ap_officers', 'id', 'full_name'))),
@@ -216,6 +216,8 @@ final class ApForms
             $groupId = (int)$db->insert('nu_menus', $base + ['menu_label' => self::GROUP_LABEL, 'menu_target' => '', 'menu_parent_id' => 0, 'menu_order' => 20, 'menu_roles' => self::FIELD, 'menu_role_access' => json_encode(explode(',', self::FIELD))]);
             if (!$groupId) { $groupId = (int)$db->fetchOne("SELECT menu_id FROM nu_menus WHERE menu_label = ? AND menu_type = 'group' AND project_id = ?", [self::GROUP_LABEL, $projectId])['menu_id']; }
         }
+        // The first releases showed 'Treatments (ROF)' to technicians, but the studio form refuses them: they use the Record of Fumigation page.
+        $db->update('nu_menus', ['menu_roles' => self::ADMIN, 'menu_role_access' => json_encode(explode(',', self::ADMIN))], "menu_target = 'ap_treatments' AND project_id = ? AND menu_roles = ?", [$projectId, self::FIELD]);
         foreach (self::definitions() as $code => $d) {
             if (in_array($d['type'] ?? 'main', ['subform', 'public'], true)) { continue; }
             if ($db->fetchOne('SELECT menu_id FROM nu_menus WHERE menu_target = ? AND project_id = ?', [$code, $projectId])) { continue; }
