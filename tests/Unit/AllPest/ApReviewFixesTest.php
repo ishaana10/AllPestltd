@@ -48,4 +48,11 @@ final class ApReviewFixesTest extends TestCase
         $page = (string)file_get_contents(dirname(__DIR__, 3) . '/public_allpest_request.php');
         $this->assertStringContainsString('j.message||j.error', $page);
     }
+
+    public function testSidebarEntryOpensTheAllPestModuleInsteadOfLookingForAForm(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $this->assertTrue(is_file($root . '/modules/allpest/allpest.php'));
+        $this->assertStringContainsString("'allpest'", (string)file_get_contents($root . '/assets/js/nubuilder-next.js'));
+    }
 }
