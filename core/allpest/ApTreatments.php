@@ -501,7 +501,8 @@ final class ApTreatments
         return $d->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s');
     }
 
-    private static function audit(string $action, string $treatmentId, array $details): void
+    /** Audit hook shared with ApSigning: an injected auditor (tests) or ApAudit::event once it exists. */
+    public static function audit(string $action, string $treatmentId, array $details): void
     {
         if (self::$auditor !== null) {
             (self::$auditor)($action, $treatmentId, $details);

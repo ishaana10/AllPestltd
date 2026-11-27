@@ -62,6 +62,40 @@ final class ApUploads
             $mime = 'image/jpeg';
         }
 
+        return self::persist($bytes, $ext, $mime, (string)($phpFile['name'] ?? ''), $purpose, $userOrIp, $device);
+    }
+
+    /**
+     * Store a drawn signature (PNG with transparency) as a small PNG: scaled to at most 600 px on the long edge, maximum compression.
+     * @return array{file_id:string,bytes:int,sha256:string}
+     */
+    public static function storePng(string $pngBytes, string $purpose, string $userOrIp, string $device): array
+    {
+        if (strncmp($pngBytes, "\x89PNG\r\n\x1a\n", 8) !== 0) {
+            throw new ApUploadRejected('Not a PNG image.');
+        }
+        $im = @imagecreatefromstring($pngBytes);
+        if ($im === false) {
+            throw new ApUploadRejected('The image could not be read.');
+        }
+        $w = imagesx($im);
+        $h = imagesy($im);
+        if (max($w, $h) > 600) {
+            $scale = 600 / max($w, $h);
+            $scaled = imagescale($im, max(1, (int)round($w * $scale)), max(1, (int)round($h * $scale)));
+            if ($scaled !== false) { $im = $scaled; }
+        }
+        imagealphablending($im, false);
+        imagesavealpha($im, true);
+        ob_start();
+        imagepng($im, null, 9);
+        $bytes = (string)ob_get_clean();
+        return self::persist($bytes, 'png', 'image/png', 'signature.png', $purpose, $userOrIp, $device);
+    }
+
+    /** @return array{file_id:string,bytes:int,sha256:string} */
+    private static function persist(string $bytes, string $ext, string $mime, string $originalName, string $purpose, string $userOrIp, string $device): array
+    {
         $dir = self::directory();
         $stored = bin2hex(random_bytes(16)) . '.' . $ext;
         if (file_put_contents($dir . '/' . $stored, $bytes) === false) {
@@ -72,7 +106,7 @@ final class ApUploads
         self::db()->insert('ap_files', [
             'id' => $id,
             'purpose' => $purpose,
-            'original_name' => mb_substr(basename((string)($phpFile['name'] ?? '')), 0, 255),
+            'original_name' => mb_substr(basename($originalName), 0, 255),
             'stored_name' => $stored,
             'mime' => $mime,
             'bytes' => strlen($bytes),
