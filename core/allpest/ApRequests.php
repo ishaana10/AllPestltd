@@ -246,8 +246,9 @@ final class ApRequests
                 }
             }
             $tid = ApId::uuid();
+            $seq = (int)$db->fetchOne('SELECT COUNT(*) AS n FROM ap_treatments WHERE request_id = ?', [$requestId])['n'] + 1;
             $db->insert('ap_treatments', [
-                'id' => $tid, 'request_id' => $requestId, 'rof_type' => $rof, 'status' => 'planned', 'schedule_id' => (string)$plan['schedule_id'],
+                'id' => $tid, 'request_id' => $requestId, 'rof_no' => (string)($db->fetchOne('SELECT reference FROM ap_requests WHERE id = ?', [$requestId])['reference'] ?? '') . '-' . $seq, 'rof_type' => $rof, 'status' => 'planned', 'schedule_id' => (string)$plan['schedule_id'],
                 'technician_id' => $techId, 'officer_id' => $officerId, 'scheduled_start' => $start->format('Y-m-d H:i:s'),
                 'site_lat' => isset($plan['site_lat']) && is_numeric($plan['site_lat']) ? (float)$plan['site_lat'] : null,
                 'site_lng' => isset($plan['site_lng']) && is_numeric($plan['site_lng']) ? (float)$plan['site_lng'] : null,

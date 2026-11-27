@@ -142,7 +142,7 @@ final class ApRof
             'A' => ['full_name' => $tech['full_name'] ?? '', 'accreditation_no' => $tech['accreditation_no'] ?? ($tech['registration_no'] ?? '')],
             'B' => [
                 'provider_id' => (string)ApSettings::get('treatment_provider_id', ''), 'client' => trim((string)($r['customer_name'] ?? '') . "\n" . (string)($r['customer_address'] ?? '')),
-                'job_no' => $r['reference'] ?? '', 'street' => $t['loc_street'] ?? ($r['site_address'] ?? ''), 'suburb' => $t['loc_suburb'] ?? '', 'country' => $t['loc_country'] ?? '', 'postcode' => $t['loc_postcode'] ?? '',
+                'job_no' => ($t['rof_no'] ?? '') !== '' ? (string)$t['rof_no'] : (string)($r['reference'] ?? ''), 'order_no' => (string)($r['reference'] ?? ''), 'street' => $t['loc_street'] ?? ($r['site_address'] ?? ''), 'suburb' => $t['loc_suburb'] ?? '', 'country' => $t['loc_country'] ?? '', 'postcode' => $t['loc_postcode'] ?? '',
                 'description' => $t['consignment_description'] ?? '', 'port_of_loading' => (string)($containers[0]['port_of_loading'] ?? ''), 'targets' => array_values(array_filter(explode(',', (string)($t['target_of_fumigation'] ?? '')))), 'target_other' => $t['target_other'] ?? '',
                 'containers' => $containers,
             ],
