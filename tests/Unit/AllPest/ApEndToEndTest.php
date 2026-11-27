@@ -95,7 +95,7 @@ final class ApEndToEndTest extends TestCase
         $sched = ApSchedules::save(['name' => 'General 48', 'treatment_type' => 'general', 'dose_rate' => 48, 'exposure_hours' => 24, 'min_temp_c' => 21, 'compensation_allowed' => 1, 'topups_allowed' => 1, 'retention_class' => 'standard']);
         ApRequests::confirm($req, ['site_lat' => -17.6, 'site_lng' => 177.45], 'admin1');
         $tid = ApRequests::createTreatment($req, $consIds, ['scheduled_start' => '2026-12-10 06:00:00', 'site_lat' => -17.6, 'site_lng' => 177.45, 'technician_id' => $tech,
-            'officer_id' => $officer, 'schedule_id' => $sched, 'rof_type' => 'general', 'enclosure_type' => 'container', 'fumigation_type' => 'ambient']);
+            'officer_id' => $officer, 'schedule_id' => $sched, 'rof_type' => 'general', 'enclosure_type' => 'container_stack', 'fumigation_type' => 'ambient']);
         $tcs = array_column($this->db->fetchAll('SELECT tc.id FROM ap_treatment_containers tc JOIN ap_consignments c ON c.id = tc.consignment_id WHERE tc.treatment_id = ? ORDER BY c.container_no', [$tid]), 'id');
         $this->assertCount(5, $tcs);
 

@@ -5,7 +5,7 @@ use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/support/ApTestDb.php';
 foreach (['ApId', 'ApSchema', 'ApDb', 'ApSettings', 'ApUploads', 'ApRequests', 'ApTechnicians', 'ApEquipment', 'ApSchedules', 'ApStock',
-          'ApStandards', 'ApDose', 'ApReadings', 'ApTemperature', 'ApResult', 'ApTreatments', 'ApCertificateRenderer', 'ApCertificates'] as $c) {
+          'ApStandards', 'ApDose', 'ApReadings', 'ApTemperature', 'ApResult', 'ApTreatments', 'ApCertificateRenderer', 'ApCertificates', 'ApUploads', 'ApBranding'] as $c) {
     require_once dirname(__DIR__, 3) . "/core/allpest/$c.php";
 }
 
@@ -47,7 +47,7 @@ final class ApCertificatesTest extends TestCase
         $sched = ApSchedules::save(['name' => 'General 48 g/m3, 24 h', 'treatment_type' => 'general', 'dose_rate' => 48, 'exposure_hours' => 24, 'min_temp_c' => 21, 'retention_class' => 'standard']);
         ApRequests::confirm($r['request_id'], [], 'a');
         $this->tid = ApRequests::createTreatment($r['request_id'], $cons, ['scheduled_start' => '2026-12-10 06:00:00', 'technician_id' => $tech, 'officer_id' => $officer,
-            'schedule_id' => $sched, 'rof_type' => 'general', 'enclosure_type' => 'container', 'fumigation_type' => 'ambient']);
+            'schedule_id' => $sched, 'rof_type' => 'general', 'enclosure_type' => 'container_stack', 'fumigation_type' => 'ambient']);
         $eq = ApId::uuid();
         $this->db->insert('ap_equipment', ['id' => $eq, 'kind' => 'detector', 'name' => 'Detector 1', 'serial_no' => 'ABC-12345']);
         $this->db->exec("UPDATE ap_treatments SET status = 'closed', result = 'partial', injected_at = '2026-12-10 06:00:00', start_point_at = '2026-12-10 06:30:00',
@@ -318,5 +318,24 @@ final class ApCertificatesTest extends TestCase
         $d['client']['name'] = '<script>alert(1)</script> & Co';
         $pdf = ApCertificateRenderer::render($d);
         $this->assertStringStartsWith('%PDF', $pdf);
+    }
+
+    public function testBrandingIsRenderOnlyAndLogoIsPrinted(): void
+    {
+        $d = ApCertificates::data($this->tcs[0], 'AP-2026-99998', $this->utc('2026-12-11 13:00:00'));
+        $this->assertTrue(array_key_exists('_branding', $d));
+        $before = ApCertificates::hash($d);
+        $dir = sys_get_temp_dir() . '/ap_cb_' . bin2hex(random_bytes(3)); mkdir($dir);
+        ApUploads::configure($this->db, $dir);
+        $im = imagecreatetruecolor(60, 30); $p = tempnam(sys_get_temp_dir(), 'lg'); imagepng($im, $p);
+        $r = ApUploads::store(['name' => 'l.png', 'type' => 'image/png', 'size' => filesize($p), 'tmp_name' => $p, 'error' => 0], 'other', 'u', 't');
+        ApBranding::setLogo($r['file_id']);
+        ApSettings::set('company_phone', '+679 666 0000');
+        $d2 = ApCertificates::data($this->tcs[0], 'AP-2026-99998', $this->utc('2026-12-11 13:00:00'));
+        $this->assertSame($before, ApCertificates::hash($d2), 'logo and contact details must not change the certificate hash');
+        $this->assertTrue(is_file((string)$d2['_branding']['logo_path']));
+        $this->assertStringContainsString('/Subtype /Image', ApCertificateRenderer::render($d2));
+        foreach (glob($dir . '/{,.}*', GLOB_BRACE) ?: [] as $f) { if (is_file($f)) { @unlink($f); } }
+        @rmdir($dir);
     }
 }

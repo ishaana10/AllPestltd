@@ -40,7 +40,7 @@ final class ApRequestFlowTest extends TestCase
     {
         return array_merge([
             'scheduled_start' => '2099-01-05 06:00:00', 'site_lat' => -17.6, 'site_lng' => 177.45, 'technician_id' => $this->tech, 'officer_id' => $this->officer,
-            'schedule_id' => $this->sched, 'rof_type' => 'general', 'enclosure_type' => 'container', 'fumigation_type' => 'ambient',
+            'schedule_id' => $this->sched, 'rof_type' => 'general', 'enclosure_type' => 'container_stack', 'fumigation_type' => 'ambient',
         ], $over);
     }
 
@@ -109,6 +109,31 @@ final class ApRequestFlowTest extends TestCase
         ApRequests::confirm($this->reqId, [], 'a');
         $this->expectException(InvalidArgumentException::class);
         ApRequests::createTreatment($this->reqId, [$this->cons[0]], $this->plan(['schedule_id' => $per, 'rof_type' => 'general']));
+    }
+
+    public function testUnsheetedContainersGetOneRecordEachAndCannotShareOne(): void
+    {
+        ApRequests::confirm($this->reqId, [], 'admin');
+        try {
+            ApRequests::createTreatment($this->reqId, [$this->cons[0], $this->cons[1]], $this->plan(['enclosure_type' => 'container']));
+            $this->fail('two un-sheeted containers must not share one record of fumigation');
+        } catch (InvalidArgumentException $e) {
+            $this->assertStringContainsString('one record', strtolower($e->getMessage()));
+        }
+        $ids = ApRequests::createTreatments($this->reqId, $this->cons, $this->plan(['enclosure_type' => 'container']));
+        $this->assertCount(4, $ids);
+        foreach ($ids as $tid) {
+            $this->assertSame(1, (int)$this->db->fetchOne('SELECT COUNT(*) n FROM ap_treatment_containers WHERE treatment_id = ?', [$tid])['n']);
+        }
+        $this->assertSame('scheduled', $this->db->fetchOne('SELECT status FROM ap_requests WHERE id = ?', [$this->reqId])['status']);
+    }
+
+    public function testSheetedContainersStayTogetherInOneRecord(): void
+    {
+        ApRequests::confirm($this->reqId, [], 'admin');
+        $ids = ApRequests::createTreatments($this->reqId, $this->cons, $this->plan(['enclosure_type' => 'container_stack']));
+        $this->assertCount(1, $ids);
+        $this->assertSame(4, (int)$this->db->fetchOne('SELECT COUNT(*) n FROM ap_treatment_containers WHERE treatment_id = ?', [$ids[0]])['n']);
     }
 
     public function testSplitIntoTwoTreatmentsKeepsEachContainerInExactlyOne(): void

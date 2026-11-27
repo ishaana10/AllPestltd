@@ -47,7 +47,7 @@ final class ApSigningTest extends TestCase
         $sched = ApSchedules::save(['name' => 'G', 'treatment_type' => 'general', 'dose_rate' => 48, 'exposure_hours' => 24, 'min_temp_c' => 21, 'retention_class' => 'standard']);
         ApRequests::confirm($r['request_id'], [], 'a');
         $this->tid = ApRequests::createTreatment($r['request_id'], $cons, ['scheduled_start' => '2026-12-10 06:00:00', 'technician_id' => $this->tech, 'officer_id' => $officer,
-            'schedule_id' => $sched, 'rof_type' => 'general', 'enclosure_type' => 'container', 'fumigation_type' => 'ambient']);
+            'schedule_id' => $sched, 'rof_type' => 'general', 'enclosure_type' => 'container_stack', 'fumigation_type' => 'ambient']);
         $this->closeIt();
     }
 

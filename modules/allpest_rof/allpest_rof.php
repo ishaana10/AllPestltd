@@ -146,7 +146,7 @@ if (!ApAccess::can($uid, 'admin.pages') && !ApAccess::can($uid, 'treatment.recor
     $('n_go').onclick = function () {
       post({action: 'create', customer_name: $('n_name').value, customer_email: $('n_email').value, customer_address: $('n_addr').value, site_address: $('n_site').value, containers: $('n_cont').value,
         rof_type: $('n_type').value, schedule_id: $('n_sched').value, technician_id: $('n_tech').value, officer_id: $('n_off').value, enclosure_type: $('n_enc').value, fumigation_type: $('n_fum').value,
-        scheduled_start: $('n_start').value ? new Date($('n_start').value).toISOString() : ''}).then(function (j) { say('Created ' + j.reference + '.'); $('newcard').hidden = true; load(j.treatment_id); }).catch(function (e) { say(e.message, true); });
+        scheduled_start: $('n_start').value ? new Date($('n_start').value).toISOString() : ''}).then(function (j) { say('Created ' + j.reference + ((j.treatment_ids || []).length > 1 ? ' with ' + j.treatment_ids.length + ' records, one per container' : '') + '.'); $('newcard').hidden = true; load(j.treatment_id); }).catch(function (e) { say(e.message, true); });
     };
   }).catch(function () {});
   var pre = window.AP_ROF_NEXT || null; window.AP_ROF_NEXT = null;

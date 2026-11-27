@@ -5,7 +5,7 @@ use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/support/ApTestDb.php';
 foreach (['ApId', 'ApSchema', 'ApDb', 'ApSettings', 'ApUploads', 'ApRequests', 'ApTechnicians', 'ApEquipment', 'ApSchedules', 'ApStock',
-          'ApStandards', 'ApDose', 'ApReadings', 'ApTemperature', 'ApResult', 'ApTreatments', 'ApRof', 'ApRofRenderer'] as $c) {
+          'ApStandards', 'ApDose', 'ApReadings', 'ApTemperature', 'ApResult', 'ApTreatments', 'ApRof', 'ApRofRenderer', 'ApBranding'] as $c) {
     require_once dirname(__DIR__, 3) . "/core/allpest/$c.php";
 }
 
@@ -31,14 +31,14 @@ final class ApRofTest extends TestCase
         $sched = ApSchedules::save(['name' => 'General 48', 'treatment_type' => 'general', 'dose_rate' => 48, 'exposure_hours' => 24, 'min_temp_c' => 21, 'compensation_allowed' => 1, 'topups_allowed' => 1, 'retention_class' => 'standard']);
         $psched = ApSchedules::save(['name' => 'Perishable 2', 'treatment_type' => 'perishable', 'dose_rate' => 32, 'exposure_hours' => 2, 'min_temp_c' => 21, 'compensation_allowed' => 0, 'topups_allowed' => 0, 'retention_class' => 'standard']);
         ApRequests::confirm($r['request_id'], [], 'a');
-        $mk = fn (string $type) => ApRequests::createTreatment($r['request_id'], [$cid], ['scheduled_start' => '2026-12-10 06:00:00', 'technician_id' => $tech, 'officer_id' => $officer, 'schedule_id' => $sched, 'rof_type' => $type, 'enclosure_type' => 'container', 'fumigation_type' => 'ambient']);
+        $mk = fn (string $type) => ApRequests::createTreatment($r['request_id'], [$cid], ['scheduled_start' => '2026-12-10 06:00:00', 'technician_id' => $tech, 'officer_id' => $officer, 'schedule_id' => $sched, 'rof_type' => $type, 'enclosure_type' => 'container_stack', 'fumigation_type' => 'ambient']);
         $this->tid = $mk('general');
         // a second treatment on the same container is refused by the engine, so the perishable one gets its own request
         $r2 = ApRequests::submitPublic(['customer_name' => 'Fruit Co', 'customer_email' => 'f@example.com', 'site_address' => 'Shed 4', 'client_token' => bin2hex(random_bytes(5)),
             'consignments' => [['container_no' => 'MSKU0000002']]], [], '1.1.1.2');
         $cid2 = $this->db->fetchOne('SELECT id FROM ap_consignments WHERE request_id = ?', [$r2['request_id']])['id'];
         ApRequests::confirm($r2['request_id'], [], 'a');
-        $this->ptid = ApRequests::createTreatment($r2['request_id'], [$cid2], ['scheduled_start' => '2026-12-10 06:00:00', 'technician_id' => $tech, 'officer_id' => $officer, 'schedule_id' => $psched, 'rof_type' => 'perishable', 'enclosure_type' => 'container', 'fumigation_type' => 'ambient']);
+        $this->ptid = ApRequests::createTreatment($r2['request_id'], [$cid2], ['scheduled_start' => '2026-12-10 06:00:00', 'technician_id' => $tech, 'officer_id' => $officer, 'schedule_id' => $psched, 'rof_type' => 'perishable', 'enclosure_type' => 'container_stack', 'fumigation_type' => 'ambient']);
     }
 
     protected function tearDown(): void { ApTreatments::setAuditor(null); }
@@ -169,5 +169,20 @@ final class ApRofTest extends TestCase
         }
         $this->assertTrue(array_key_exists('_assets', ApRof::pdfData($this->tid)));
         $this->assertTrue(!array_key_exists('_assets', ApRof::document($this->tid)), 'server paths never go in the JSON record');
+    }
+
+    public function testRofCarriesCompanyBrandingInThePdfOnly(): void
+    {
+        $dir = sys_get_temp_dir() . '/ap_rb_' . bin2hex(random_bytes(3)); mkdir($dir);
+        ApUploads::configure($this->db, $dir);
+        $im = imagecreatetruecolor(60, 30); $p = tempnam(sys_get_temp_dir(), 'lg'); imagepng($im, $p);
+        $r = ApUploads::store(['name' => 'l.png', 'type' => 'image/png', 'size' => filesize($p), 'tmp_name' => $p, 'error' => 0], 'other', 'u', 't');
+        ApBranding::setLogo($r['file_id']);
+        $this->assertTrue(!array_key_exists('_branding', ApRof::document($this->tid)), 'server paths never go in the JSON record');
+        $d = ApRof::pdfData($this->tid);
+        $this->assertTrue(is_file((string)$d['_branding']['logo_path']));
+        $this->assertStringContainsString('/Subtype /Image', ApRofRenderer::render($d));
+        foreach (glob($dir . '/{,.}*', GLOB_BRACE) ?: [] as $f) { if (is_file($f)) { @unlink($f); } }
+        @rmdir($dir);
     }
 }

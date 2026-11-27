@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/ApBranding.php';
+
 require_once __DIR__ . '/ApId.php';
 require_once __DIR__ . '/ApDb.php';
 require_once __DIR__ . '/ApSettings.php';
@@ -170,6 +172,7 @@ final class ApRof
             if (class_exists('ApUploads')) { $assets[(string)$r['role']] = ApUploads::path((string)$r['image_file_id']); }
         }
         $d['_assets'] = $assets;
+        $d['_branding'] = class_exists('ApBranding') ? ApBranding::load() : [];
         return $d;
     }
 

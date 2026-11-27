@@ -35,7 +35,8 @@ try {
             echo json_encode(['ok' => true]);
             break;
         case 'schedule':
-            echo json_encode(['treatment_id' => ApRequests::createTreatment((string)($_POST['request_id'] ?? ''), (array)($_POST['container_ids'] ?? []), $_POST)]);
+            $tids = ApRequests::createTreatments((string)($_POST['request_id'] ?? ''), (array)($_POST['container_ids'] ?? []), $_POST);
+            echo json_encode(['treatment_id' => $tids[0], 'treatment_ids' => $tids]);
             break;
         default: http_response_code(400); echo json_encode(['error' => 'Unknown action']);
     }

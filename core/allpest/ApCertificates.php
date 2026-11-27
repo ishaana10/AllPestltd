@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/ApBranding.php';
+
 require_once __DIR__ . '/ApId.php';
 require_once __DIR__ . '/ApDb.php';
 require_once __DIR__ . '/ApSettings.php';
@@ -145,6 +147,7 @@ final class ApCertificates
             'equipment' => $equipment, 'signatures' => $signatures, 'rof_version' => (int)$t['version'],
             'declaration' => (string)ApSettings::get('certificate_declaration', self::DECLARATION),
             '_assets' => $assets,
+            '_branding' => class_exists('ApBranding') ? ApBranding::load() : [],
         ];
     }
 

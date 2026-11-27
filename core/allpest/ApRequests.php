@@ -174,6 +174,25 @@ final class ApRequests
     }
 
     /**
+     * Create the record(s) of fumigation for these containers: one per container when they are fumigated un-sheeted
+     * (enclosure_type 'container'), otherwise one record holding them all.
+     * @param string[] $containerIds
+     * @param array<string,mixed> $plan as for createTreatment
+     * @return string[] treatment ids
+     */
+    public static function createTreatments(string $requestId, array $containerIds, array $plan): array
+    {
+        $ids = array_values(array_unique(array_map('strval', $containerIds)));
+        if ((string)($plan['enclosure_type'] ?? '') !== 'container') {
+            return [self::createTreatment($requestId, $ids, $plan)];
+        }
+        if (!$ids) { throw new InvalidArgumentException('Choose at least one container.'); }
+        $out = [];
+        foreach ($ids as $cid) { $out[] = self::createTreatment($requestId, [$cid], $plan); }
+        return $out;
+    }
+
+    /**
      * Group consignments of a confirmed request into one treatment (one ROF). A request may have several treatments;
      * each container belongs to exactly one. $plan: scheduled_start (UTC), site_lat, site_lng, technician_id, officer_id,
      * schedule_id, rof_type (general|perishable), enclosure_type, fumigation_type (ambient|controlled).
@@ -193,6 +212,9 @@ final class ApRequests
 
         $ids = array_values(array_unique(array_map('strval', $containerIds)));
         if (!$ids) { throw new InvalidArgumentException('Choose at least one container.'); }
+        if ((string)($plan['enclosure_type'] ?? '') === 'container' && count($ids) > 1) {
+            throw new InvalidArgumentException('An un-sheeted container fumigation has one record of fumigation per container.');
+        }
         $rof = (string)($plan['rof_type'] ?? '');
         if (!in_array($rof, ['general', 'perishable'], true)) { throw new InvalidArgumentException('ROF type must be general or perishable.'); }
         $fum = (string)($plan['fumigation_type'] ?? '');

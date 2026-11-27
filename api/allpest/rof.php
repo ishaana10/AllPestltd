@@ -50,9 +50,9 @@ try {
         ApRequests::confirm($req['request_id'], [], $uid);
         $ids = array_column($db->fetchAll('SELECT id FROM ap_consignments WHERE request_id = ?', [$req['request_id']]), 'id');
         try { $start = (new DateTimeImmutable((string)($_POST['scheduled_start'] ?? '')))->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s'); } catch (Throwable $e) { throw new InvalidArgumentException('Enter the planned start date and time.'); }
-        $tid = ApRequests::createTreatment($req['request_id'], $ids, ['scheduled_start' => $start, 'technician_id' => (string)($_POST['technician_id'] ?? ''), 'officer_id' => (string)($_POST['officer_id'] ?? ''),
+        $tids = ApRequests::createTreatments($req['request_id'], $ids, ['scheduled_start' => $start, 'technician_id' => (string)($_POST['technician_id'] ?? ''), 'officer_id' => (string)($_POST['officer_id'] ?? ''),
             'schedule_id' => (string)($_POST['schedule_id'] ?? ''), 'rof_type' => (string)($_POST['rof_type'] ?? 'general'), 'enclosure_type' => (string)($_POST['enclosure_type'] ?? ''), 'fumigation_type' => (string)($_POST['fumigation_type'] ?? 'ambient')]);
-        echo json_encode(['treatment_id' => $tid, 'reference' => $req['reference']]);
+        echo json_encode(['treatment_id' => $tids[0], 'treatment_ids' => $tids, 'reference' => $req['reference']]);
         exit;
     }
     $tid = (string)($_POST['treatment_id'] ?? '');
