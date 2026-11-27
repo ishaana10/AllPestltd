@@ -244,7 +244,7 @@ window.NuApp = {
     'procedures',
     'customer_requests',
     'projects','cloud_storage',
-    'allpest',
+    'allpest','allpest_work',
     'system_demo_files'
   ]),
 

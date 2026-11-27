@@ -6,7 +6,7 @@
 
   if (!id) {
     $('pick').hidden = false;
-    U.get('treatments.php', { mine: 1 }).then(function (r) { U.table($('mine'), r, [{ label: 'Reference', render: function (x) { return '<a href="?id=' + U.esc(x.id) + '">' + U.esc(x.reference) + '</a>'; } }, { label: 'Customer', key: 'customer_name' }, { label: 'Status', key: 'status' }]); }, U.fail);
+    U.get('treatments.php', { mine: 1 }).then(function (r) { U.table($('mine'), r, [{ label: 'Reference', render: function (x) { return '<a href="?id=' + U.esc(x.id) + '" data-open="' + U.esc(x.id) + '">' + U.esc(x.reference) + '</a>'; } }, { label: 'Customer', key: 'customer_name' }, { label: 'Status', key: 'status' }]); $('mine').addEventListener('click', function (e) { var a = e.target.closest('a[data-open]'); if (a) { e.preventDefault(); U.open(a.getAttribute('data-open')); } }); }, U.fail);
     return;
   }
   $('rof').hidden = false;
@@ -21,7 +21,8 @@
   function render() {
     var st = T.status;
     $('head').innerHTML = '<strong>' + U.esc(T.rof_type) + '</strong> fumigation &middot; <span class="ap-badge">' + U.esc(st) + '</span> &middot; version ' + U.esc(T.version) +
-      '<br>' + T.containers.map(function (c) { return U.esc(tcName(c)); }).join(', ') + (st === 'closed' ? '<br><a href="signing.php?id=' + U.esc(id) + '">Go to signing and certificates</a>' : '');
+      '<br>' + T.containers.map(function (c) { return U.esc(tcName(c)); }).join(', ') + (st === 'closed' && !$('s_sign') ? '<br><a href="signing.php?id=' + U.esc(id) + '">Go to signing and certificates</a>' : '');
+    if (st === 'closed' && $('s_sign')) { show('s_sign', true); if (window.ApSigning && !ApSigning.started) { ApSigning.start(id); } }
     var locked = !!T.locked_at;
     $('locked').hidden = !locked; if (locked) { $('locked').textContent = 'This record is signed and locked. Use the correction form on the signing page.'; }
     show('s_pre', !locked && (st === 'planned' || st === 'prechecked'));

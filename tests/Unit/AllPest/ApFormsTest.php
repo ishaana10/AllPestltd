@@ -84,7 +84,8 @@ final class ApFormsTest extends TestCase
         $kids = $this->db->fetchAll('SELECT menu_target FROM nu_menus WHERE menu_parent_id = ?', [$g[0]['menu_id']]);
         $expected = array_keys(array_filter(ApForms::definitions(), fn ($d) => ($d['type'] ?? 'main') !== 'subform'));
         $this->assertSame([], array_diff($expected, array_column($kids, 'menu_target')));
-        $this->assertCount(count($expected), $kids);
+        $this->assertContains('allpest_work', array_column($kids, 'menu_target'));
+        $this->assertCount(count($expected) + count(ApForms::moduleEntries()), $kids);
         $this->assertStringContainsString('ap_technician', (string)$g[0]['menu_role_access']);
     }
 

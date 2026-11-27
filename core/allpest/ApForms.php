@@ -140,6 +140,12 @@ final class ApForms
         return $created;
     }
 
+    /** Sidebar entries that open a studio module rather than a form: target => [label, order, roles]. */
+    public static function moduleEntries(): array
+    {
+        return ['allpest_work' => ['Treatment Workspace', 5, self::FIELD]];
+    }
+
     private static function provisionMenu(object $db, int $projectId): void
     {
         $base = ['menu_type' => 'group', 'menu_icon' => 'clipboard', 'menu_browse_mode' => 'inline', 'menu_preview_mode' => 'inline', 'menu_default_view' => 'browse', 'menu_active' => 1, 'project_id' => $projectId];
@@ -160,6 +166,12 @@ final class ApForms
             if ($db->fetchOne('SELECT menu_id FROM nu_menus WHERE menu_target = ? AND project_id = ?', [$code, $projectId])) { continue; }
             $db->insert('nu_menus', ['menu_label' => $d['name'], 'menu_type' => 'form', 'menu_target' => $code, 'menu_parent_id' => $groupId, 'menu_order' => $d['order'], 'menu_roles' => $d['roles'],
                 'menu_role_access' => json_encode(explode(',', $d['roles'])), 'menu_active' => 1, 'menu_icon' => 'form', 'menu_open_mode' => 'inline|browse', 'menu_browse_mode' => 'inline',
+                'menu_preview_mode' => 'inline', 'menu_default_view' => 'browse', 'project_id' => $projectId]);
+        }
+        foreach (self::moduleEntries() as $target => [$label, $order, $roles]) {
+            if ($db->fetchOne('SELECT menu_id FROM nu_menus WHERE menu_target = ? AND project_id = ?', [$target, $projectId])) { continue; }
+            $db->insert('nu_menus', ['menu_label' => $label, 'menu_type' => 'module', 'menu_target' => $target, 'menu_parent_id' => $groupId, 'menu_order' => $order, 'menu_roles' => $roles,
+                'menu_role_access' => json_encode(explode(',', $roles)), 'menu_active' => 1, 'menu_icon' => 'clipboard', 'menu_open_mode' => 'inline|browse', 'menu_browse_mode' => 'inline',
                 'menu_preview_mode' => 'inline', 'menu_default_view' => 'browse', 'project_id' => $projectId]);
         }
     }

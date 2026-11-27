@@ -55,4 +55,18 @@ final class ApReviewFixesTest extends TestCase
         $this->assertTrue(is_file($root . '/modules/allpest/allpest.php'));
         $this->assertStringContainsString("'allpest'", (string)file_get_contents($root . '/assets/js/nubuilder-next.js'));
     }
+
+    public function testTreatmentWorkspaceIsAStudioModuleWithAccessCheckAndScopedStyles(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $m = (string)file_get_contents($root . '/modules/allpest_work/allpest_work.php');
+        $this->assertStringContainsString('core/module_bootstrap.php', $m);
+        $this->assertStringContainsString("'treatment.record'", $m);
+        $this->assertStringContainsString("'allpest_work'", (string)file_get_contents($root . '/assets/js/nubuilder-next.js'));
+        foreach (preg_split('/}/', (string)file_get_contents($root . '/assets/css/allpest-studio.css')) as $rule) {
+            $sel = trim((string)strstr($rule, '{', true));
+            if ($sel === '' || str_starts_with($sel, '/*') || str_starts_with($sel, '.ap-toast')) { continue; }
+            $this->assertStringStartsWith('.ap-scope', $sel, 'unscoped rule: ' . $sel);
+        }
+    }
 }
