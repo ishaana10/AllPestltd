@@ -112,8 +112,12 @@ if (!ApAccess::can($uid, 'admin.pages') && !ApAccess::can($uid, 'treatment.recor
       (E.signatures.length ? '' : '<tr><td colspan="3" class="ap-muted">Not signed yet. Signing is in the Treatment Workspace.</td></tr>') +
       '<tr><td>Fumigation result</td><td colspan="2">' + E.results.map(function (r) { return v(r.container_no) + ': ' + (r.result ? v(r.result) : 'pending'); }).join('; ') + '</td></tr>' +
       '<tr><td>Government officer if supervised</td><td colspan="2">' + v(E.officer.full_name || '') + (E.officer.designation ? ', ' + v(E.officer.designation) : '') + '</td></tr></table>';
-    h += '<p class="noprint"><button class="ap-btn" onclick="window.print()">Print</button></p>';
+    var nextStep = {planned: 'Do the pre-treatment check.', prechecked: 'Apply the gas and record the dose.', dosed: 'Take the start-point readings.', exposure: 'Take exposure readings, then top-up if needed and start ventilation.', ventilating: 'Record the TLV readings, then close the treatment.', closed: 'Sign the record and issue certificates.'}[d.status] || '';
+    h += '<p class="noprint">Status: <strong>' + esc(d.status) + '</strong>' + (nextStep && !dis ? '. Next: ' + esc(nextStep) : '') + '</p>';
+    h += '<p class="noprint">' + (dis ? '' : '<button class="ap-btn" id="goWork">Record dosing, readings, top-up and TLV</button> ') + '<button class="ap-btn" onclick="window.print()">Print</button> <button class="ap-btn" id="backList">All records</button></p>';
     $('doc').innerHTML = h; $('doc').hidden = false; $('pick').hidden = true;
+    var gw = $('goWork'); if (gw) { gw.onclick = function () { window.AP_NEXT = tid; NuApp.loadModule('allpest_work'); }; }
+    var bl = $('backList'); if (bl) { bl.onclick = function () { NuApp.loadModule('allpest_rof'); }; }
     var sd = $('saveDet'); if (sd) { sd.onclick = saveDetails; }
     var at = $('addTemp'); if (at) { at.onclick = addTemp; }
   }
@@ -145,6 +149,8 @@ if (!ApAccess::can($uid, 'admin.pages') && !ApAccess::can($uid, 'treatment.recor
         scheduled_start: $('n_start').value ? new Date($('n_start').value).toISOString() : ''}).then(function (j) { say('Created ' + j.reference + '.'); $('newcard').hidden = true; load(j.treatment_id); }).catch(function (e) { say(e.message, true); });
     };
   }).catch(function () {});
+  var pre = window.AP_ROF_NEXT || null; window.AP_ROF_NEXT = null;
+  if (pre) { load(pre); }
   fetch(TAPI + '?mine=1', {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (rows) {
     $('mine').innerHTML = rows.length ? rows.map(function (t) { return '<p><a href="#" data-id="' + esc(t.id) + '"><strong>' + esc(t.reference) + '</strong></a> ' + esc(t.customer_name) + ' &middot; ' + esc(t.rof_type) + ' &middot; ' + esc(t.status) + '</p>'; }).join('') : '<p class="ap-muted">No treatments yet.</p>';
     $('mine').onclick = function (ev) { var a = ev.target.closest('a[data-id]'); if (a) { ev.preventDefault(); load(a.dataset.id); } };

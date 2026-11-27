@@ -145,4 +145,15 @@ final class ApRofTest extends TestCase
         @unlink($f); @unlink($f . '.src');
         $this->assertSame(0, $code, implode("\n", $out));
     }
+
+    public function testRecordAndWorkspaceOpenEachOther(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $rof = (string)file_get_contents($root . '/modules/allpest_rof/allpest_rof.php');
+        $work = (string)file_get_contents($root . '/modules/allpest_work/allpest_work.php');
+        $this->assertStringContainsString("window.AP_NEXT = tid; NuApp.loadModule('allpest_work')", $rof);
+        $this->assertStringContainsString('window.AP_ROF_NEXT', $rof);
+        $this->assertStringContainsString("NuApp.loadModule('allpest_rof')", $work);
+        $this->assertStringContainsString('window.AP_ROF_NEXT = openId', $work);
+    }
 }
